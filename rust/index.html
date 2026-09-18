@@ -1,0 +1,1027 @@
+<title>Rust Byte Slices & Packet Decoding</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;1,400&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-raised: #1f2330;
+    --border: #2a2e3b;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --accent: #e8804a;
+    --accent-glow: rgba(232, 128, 74, 0.12);
+    --keyword: #c678dd;
+    --string: #98c379;
+    --type: #61afef;
+    --number: #d19a66;
+    --comment: #5c6370;
+    --fn-name: #61afef;
+    --macro-name: #e5c07b;
+    --punctuation: #abb2bf;
+    --slide-counter: #5a5e70;
+    --nav-bg: rgba(15, 17, 23, 0.92);
+    --progress: #e8804a;
+    --tag-bg: rgba(232, 128, 74, 0.1);
+    --tag-border: rgba(232, 128, 74, 0.25);
+    --tag-text: #e8804a;
+    --table-header-bg: #1a1d28;
+    --table-row-alt: rgba(30, 34, 46, 0.5);
+    --diagram-stroke: #4a4e5c;
+    --diagram-fill: #1c2030;
+    --diagram-label: #c0c4d4;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f7f6f3;
+      --surface: #ffffff;
+      --surface-raised: #f0eeea;
+      --border: #ddd9d1;
+      --text: #1a1a1a;
+      --text-dim: #6b6560;
+      --accent: #c9633a;
+      --accent-glow: rgba(201, 99, 58, 0.08);
+      --keyword: #a626a4;
+      --string: #50a14f;
+      --type: #0184bc;
+      --number: #c18401;
+      --comment: #a0a1a7;
+      --fn-name: #0184bc;
+      --macro-name: #c18401;
+      --punctuation: #383a42;
+      --slide-counter: #a0a1a7;
+      --nav-bg: rgba(247, 246, 243, 0.94);
+      --progress: #c9633a;
+      --tag-bg: rgba(201, 99, 58, 0.08);
+      --tag-border: rgba(201, 99, 58, 0.2);
+      --tag-text: #c9633a;
+      --table-header-bg: #edeae5;
+      --table-row-alt: rgba(240, 238, 234, 0.6);
+      --diagram-stroke: #bbb7af;
+      --diagram-fill: #f0eeea;
+      --diagram-label: #4a4540;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-raised: #1f2330;
+    --border: #2a2e3b;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --accent: #e8804a;
+    --accent-glow: rgba(232, 128, 74, 0.12);
+    --keyword: #c678dd;
+    --string: #98c379;
+    --type: #61afef;
+    --number: #d19a66;
+    --comment: #5c6370;
+    --fn-name: #61afef;
+    --macro-name: #e5c07b;
+    --punctuation: #abb2bf;
+    --slide-counter: #5a5e70;
+    --nav-bg: rgba(15, 17, 23, 0.92);
+    --progress: #e8804a;
+    --tag-bg: rgba(232, 128, 74, 0.1);
+    --tag-border: rgba(232, 128, 74, 0.25);
+    --tag-text: #e8804a;
+    --table-header-bg: #1a1d28;
+    --table-row-alt: rgba(30, 34, 46, 0.5);
+    --diagram-stroke: #4a4e5c;
+    --diagram-fill: #1c2030;
+    --diagram-label: #c0c4d4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .deck {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .slides-viewport {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    padding: 3rem 3.5rem 2rem;
+    display: none;
+    flex-direction: column;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    overflow-y: auto;
+  }
+  .slide.active {
+    display: flex;
+    opacity: 1;
+  }
+
+  .slide-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--tag-text);
+    background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    padding: 0.2em 0.7em;
+    border-radius: 3px;
+    margin-bottom: 1.2rem;
+    width: fit-content;
+  }
+
+  h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin-bottom: 0.4rem;
+    letter-spacing: -0.02em;
+  }
+  h1 code {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    font-weight: 700;
+    background: none;
+    padding: 0;
+    font-size: 0.92em;
+  }
+
+  .subtitle {
+    font-family: 'IBM Plex Serif', Georgia, serif;
+    font-style: italic;
+    color: var(--text-dim);
+    font-size: 1.05rem;
+    margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 0.8rem;
+    margin-top: 1.6rem;
+    letter-spacing: 0.01em;
+  }
+  h2:first-of-type { margin-top: 0; }
+
+  p {
+    max-width: 62ch;
+    margin-bottom: 0.8rem;
+    color: var(--text);
+  }
+  p.dim { color: var(--text-dim); font-size: 0.92rem; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88em;
+    background: var(--surface);
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    color: var(--type);
+  }
+
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.1rem 1.3rem;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    tab-size: 4;
+  }
+
+  .kw { color: var(--keyword); font-weight: 500; }
+  .ty { color: var(--type); }
+  .str { color: var(--string); }
+  .num { color: var(--number); }
+  .cm { color: var(--comment); font-style: italic; }
+  .fn { color: var(--fn-name); }
+  .mac { color: var(--macro-name); }
+  .pn { color: var(--punctuation); }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 56rem;
+    font-size: 0.88rem;
+    margin-bottom: 1rem;
+  }
+  thead { background: var(--table-header-bg); }
+  th {
+    text-align: left;
+    font-weight: 600;
+    padding: 0.55rem 1rem;
+    border-bottom: 2px solid var(--border);
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  td {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+  }
+  td.prose {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    font-size: 0.88rem;
+  }
+  tbody tr:nth-child(even) { background: var(--table-row-alt); }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 0.5rem;
+  }
+
+  .callout {
+    background: var(--accent-glow);
+    border-left: 3px solid var(--accent);
+    padding: 0.8rem 1.1rem;
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .callout code { background: transparent; }
+
+  .diagram-box {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0;
+  }
+
+  /* Navigation bar */
+  nav {
+    background: var(--nav-bg);
+    border-top: 1px solid var(--border);
+    padding: 0.6rem 1.5rem;
+    padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .progress-track {
+    flex: 1;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--progress);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .nav-counter {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--slide-counter);
+    min-width: 3.5rem;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .nav-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.15s, color 0.15s;
+    font-size: 1rem;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Title slide special layout */
+  .title-slide {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .title-slide h1 { font-size: 3rem; margin-bottom: 0.6rem; }
+  .title-slide .subtitle { font-size: 1.15rem; margin-bottom: 0; }
+  .title-slide .deck-meta {
+    margin-top: 2.5rem;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .rust-logo {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 1.8rem;
+    opacity: 0.7;
+  }
+
+  ul { padding-left: 1.3rem; margin-bottom: 0.8rem; }
+  li { margin-bottom: 0.3rem; max-width: 62ch; }
+
+  @media (max-width: 700px) {
+    .slide { padding: 2rem 1.2rem 1.5rem; }
+    h1 { font-size: 1.7rem; }
+    .title-slide h1 { font-size: 2.2rem; }
+    .two-col { grid-template-columns: 1fr; gap: 1rem; }
+    pre { font-size: 0.75rem; padding: 0.8rem; }
+    table { font-size: 0.78rem; }
+    td, th { padding: 0.4rem 0.6rem; }
+  }
+</style>
+
+<div class="deck">
+  <div class="slides-viewport">
+
+    <!-- SLIDE 0: Title -->
+    <div class="slide title-slide active" data-idx="0">
+      <svg class="rust-logo" viewBox="0 0 106 106" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="53" cy="53" r="50" stroke="var(--accent)" stroke-width="3" fill="none"/>
+        <text x="53" y="62" text-anchor="middle" font-family="'IBM Plex Sans', sans-serif" font-weight="700" font-size="28" fill="var(--accent)">R</text>
+      </svg>
+      <h1>Byte Slices &amp; Packet Decoding</h1>
+      <div class="subtitle">A Rust primer for Ethernet firmware engineers</div>
+      <div class="deck-meta">16 slides &middot; from &amp;[u8] to EtherType decoding</div>
+    </div>
+
+    <!-- SLIDE 1: &[u8] -->
+    <div class="slide" data-idx="1">
+      <div class="slide-tag">Fundamentals</div>
+      <h1>What is <code>&amp;[u8]</code>?</h1>
+      <div class="subtitle">A borrowed reference to a contiguous sequence of bytes</div>
+
+      <table>
+        <thead><tr><th>Part</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>[u8]</td><td class="prose">Slice of unsigned 8-bit integers &mdash; unsized, can't exist alone</td></tr>
+          <tr><td>&amp;</td><td class="prose">Borrowed reference &mdash; no ownership, no copy</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Fat pointer under the hood</h2>
+      <p><code>&amp;[u8]</code> is two machine words: a pointer to the first byte, and the length.</p>
+
+      <div class="diagram-box">
+        <svg width="380" height="100" viewBox="0 0 380 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="10" width="140" height="80" rx="4" stroke="var(--diagram-stroke)" fill="var(--diagram-fill)" stroke-width="1.5"/>
+          <line x1="71" y1="10" x2="71" y2="90" stroke="var(--diagram-stroke)" stroke-width="1"/>
+          <text x="36" y="36" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--text-dim)">ptr</text>
+          <text x="36" y="55" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--accent)">0x7f..</text>
+          <text x="106" y="36" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--text-dim)">len</text>
+          <text x="106" y="55" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="var(--accent)">14</text>
+
+          <line x1="141" y1="50" x2="195" y2="50" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+          <g transform="translate(200, 25)">
+            <rect x="0" y="0" width="24" height="24" rx="2" stroke="var(--diagram-stroke)" fill="var(--diagram-fill)" stroke-width="1"/>
+            <rect x="26" y="0" width="24" height="24" rx="2" stroke="var(--diagram-stroke)" fill="var(--diagram-fill)" stroke-width="1"/>
+            <rect x="52" y="0" width="24" height="24" rx="2" stroke="var(--diagram-stroke)" fill="var(--diagram-fill)" stroke-width="1"/>
+            <rect x="78" y="0" width="24" height="24" rx="2" stroke="var(--diagram-stroke)" fill="var(--diagram-fill)" stroke-width="1"/>
+            <rect x="104" y="0" width="24" height="24" rx="2" stroke="var(--diagram-stroke)" fill="var(--diagram-fill)" stroke-width="1"/>
+            <rect x="130" y="0" width="24" height="24" rx="2" stroke="var(--diagram-stroke)" fill="var(--diagram-fill)" stroke-width="1"/>
+            <text x="6" y="16" font-family="JetBrains Mono, monospace" font-size="9" fill="var(--diagram-label)">08</text>
+            <text x="32" y="16" font-family="JetBrains Mono, monospace" font-size="9" fill="var(--diagram-label)">00</text>
+            <text x="58" y="16" font-family="JetBrains Mono, monospace" font-size="9" fill="var(--diagram-label)">4a</text>
+            <text x="84" y="16" font-family="JetBrains Mono, monospace" font-size="9" fill="var(--diagram-label)">5c</text>
+            <text x="110" y="16" font-family="JetBrains Mono, monospace" font-size="9" fill="var(--diagram-label)">..</text>
+            <text x="136" y="16" font-family="JetBrains Mono, monospace" font-size="9" fill="var(--diagram-label)">..</text>
+            <text x="75" y="48" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="10" fill="var(--text-dim)">[u8] in memory</text>
+          </g>
+
+          <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/></marker></defs>
+        </svg>
+      </div>
+
+      <div class="callout">In networking code, <code>&amp;[u8]</code> is the universal currency &mdash; every packet parser takes a byte slice because it avoids copying raw packet data.</div>
+    </div>
+
+    <!-- SLIDE 2: Creating slices -->
+    <div class="slide" data-idx="2">
+      <div class="slide-tag">Fundamentals</div>
+      <h1>Creating <code>&amp;[u8]</code></h1>
+      <div class="subtitle">Three common sources of byte slices</div>
+
+      <pre><span class="cm">// From a Vec</span>
+<span class="kw">let</span> vec: <span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt; = <span class="mac">vec!</span>[<span class="num">0x08</span>, <span class="num">0x00</span>, <span class="num">0x4a</span>, <span class="num">0x5c</span>];
+<span class="kw">let</span> slice: &amp;[<span class="ty">u8</span>] = &amp;vec;
+
+<span class="cm">// From a fixed-size array</span>
+<span class="kw">let</span> array: [<span class="ty">u8</span>; <span class="num">4</span>] = [<span class="num">0x08</span>, <span class="num">0x00</span>, <span class="num">0x4a</span>, <span class="num">0x5c</span>];
+<span class="kw">let</span> slice: &amp;[<span class="ty">u8</span>] = &amp;array;
+
+<span class="cm">// Sub-slice (zero-copy window into existing data)</span>
+<span class="kw">let</span> sub: &amp;[<span class="ty">u8</span>] = &amp;vec[<span class="num">1</span>..<span class="num">3</span>];  <span class="cm">// [0x00, 0x4a]</span></pre>
+
+      <div class="callout">All three produce the same type: a pointer + length. No data is copied &mdash; each slice borrows from the original allocation.</div>
+    </div>
+
+    <!-- SLIDE 3: Range syntax [..] -->
+    <div class="slide" data-idx="3">
+      <div class="slide-tag">Syntax</div>
+      <h1>The <code>[..]</code> full-range slice</h1>
+      <div class="subtitle">Converting a fixed-size array into a dynamically-sized slice</div>
+
+      <pre><span class="kw">let mut</span> packet = [<span class="num">0u8</span>; <span class="num">14</span>];           <span class="cm">// type: [u8; 14]</span>
+
+<span class="kw">let</span> header = <span class="ty">MutableEthernetPacket</span>::<span class="fn">new</span>(
+    &amp;<span class="kw">mut</span> packet[..]                    <span class="cm">// type: &amp;mut [u8]</span>
+).<span class="fn">unwrap</span>();</pre>
+
+      <h2>Step by step</h2>
+      <table>
+        <thead><tr><th>Expression</th><th>Type</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td>packet</td><td>[u8; 14]</td><td class="prose">Fixed-size array on the stack</td></tr>
+          <tr><td>packet[..]</td><td>[u8]</td><td class="prose">Index with <code>RangeFull</code> &rarr; unsized slice</td></tr>
+          <tr><td>&amp;mut packet[..]</td><td>&amp;mut [u8]</td><td class="prose">Mutable borrow of the whole array as a slice</td></tr>
+        </tbody>
+      </table>
+
+      <h2>All range variants</h2>
+      <pre>&amp;packet[..]       <span class="cm">// all 14 bytes       [0..14]</span>
+&amp;packet[..<span class="num">6</span>]      <span class="cm">// first 6 bytes      destination MAC</span>
+&amp;packet[<span class="num">6</span>..]      <span class="cm">// bytes 6 onward     source MAC + ethertype</span>
+&amp;packet[<span class="num">12</span>..<span class="num">14</span>]   <span class="cm">// 2 bytes             ethertype field</span></pre>
+
+      <div class="callout"><code>&amp;mut packet</code> would also work here &mdash; Rust auto-derefs <code>&amp;mut [u8; 14]</code> into <code>&amp;mut [u8]</code>. But <code>[..]</code> makes the intent explicit.</div>
+    </div>
+
+    <!-- SLIDE 4: ICMP header layout -->
+    <div class="slide" data-idx="4">
+      <div class="slide-tag">Protocol</div>
+      <h1>ICMP Header Layout</h1>
+      <div class="subtitle">Internet Control Message Protocol &mdash; IP protocol number 1</div>
+
+      <div class="diagram-box">
+        <svg width="460" height="180" viewBox="0 0 460 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .hdr-cell { fill: var(--diagram-fill); stroke: var(--diagram-stroke); stroke-width: 1.5; }
+            .hdr-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: var(--diagram-label); }
+            .hdr-bits { font-family: 'JetBrains Mono', monospace; font-size: 9px; fill: var(--text-dim); }
+            .hdr-accent { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: var(--accent); font-weight: 500; }
+          </style>
+          <!-- Bit markers -->
+          <text x="40" y="14" class="hdr-bits" text-anchor="middle">0</text>
+          <text x="152" y="14" class="hdr-bits" text-anchor="middle">8</text>
+          <text x="264" y="14" class="hdr-bits" text-anchor="middle">16</text>
+          <text x="376" y="14" class="hdr-bits" text-anchor="middle">24</text>
+          <text x="440" y="14" class="hdr-bits" text-anchor="middle">31</text>
+
+          <!-- Row 1: Type | Code | Checksum -->
+          <rect x="10" y="22" width="112" height="36" rx="3" class="hdr-cell"/>
+          <text x="66" y="44" class="hdr-accent" text-anchor="middle">Type</text>
+          <rect x="122" y="22" width="112" height="36" rx="3" class="hdr-cell"/>
+          <text x="178" y="44" class="hdr-label" text-anchor="middle">Code</text>
+          <rect x="234" y="22" width="216" height="36" rx="3" class="hdr-cell"/>
+          <text x="342" y="44" class="hdr-label" text-anchor="middle">Checksum</text>
+
+          <!-- Row 2: ID | Sequence -->
+          <rect x="10" y="64" width="225" height="36" rx="3" class="hdr-cell"/>
+          <text x="122" y="86" class="hdr-label" text-anchor="middle">Identifier (echo)</text>
+          <rect x="235" y="64" width="215" height="36" rx="3" class="hdr-cell"/>
+          <text x="342" y="86" class="hdr-label" text-anchor="middle">Sequence (echo)</text>
+
+          <!-- Row 3: Payload -->
+          <rect x="10" y="106" width="440" height="36" rx="3" class="hdr-cell" stroke-dasharray="5,3"/>
+          <text x="230" y="128" class="hdr-label" text-anchor="middle">Payload ...</text>
+
+          <!-- Byte offset annotations -->
+          <text x="4" y="44" class="hdr-bits" text-anchor="end" transform="translate(-14,0)">[0]</text>
+          <text x="4" y="86" class="hdr-bits" text-anchor="end" transform="translate(-14,0)">[4]</text>
+          <text x="4" y="128" class="hdr-bits" text-anchor="end" transform="translate(-14,0)">[8]</text>
+        </svg>
+      </div>
+
+      <table>
+        <thead><tr><th>Type</th><th>Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td class="num">0</td><td>Echo Reply</td><td class="prose">Response to a ping</td></tr>
+          <tr><td class="num">3</td><td>Dest Unreachable</td><td class="prose">Network/host/port unreachable</td></tr>
+          <tr><td class="num">8</td><td>Echo Request</td><td class="prose">Ping</td></tr>
+          <tr><td class="num">11</td><td>Time Exceeded</td><td class="prose">TTL expired in transit</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SLIDE 5: Decoding with pnet -->
+    <div class="slide" data-idx="5">
+      <div class="slide-tag">Implementation</div>
+      <h1>Decoding ICMP with <code>pnet</code></h1>
+      <div class="subtitle">Ethernet &rarr; IPv4 &rarr; ICMP parse chain</div>
+
+      <pre><span class="kw">use</span> pnet::packet::ethernet::{<span class="ty">EthernetPacket</span>, <span class="ty">EtherTypes</span>};
+<span class="kw">use</span> pnet::packet::ipv4::<span class="ty">Ipv4Packet</span>;
+<span class="kw">use</span> pnet::packet::icmp::{<span class="ty">IcmpPacket</span>, <span class="ty">IcmpTypes</span>};
+<span class="kw">use</span> pnet::packet::<span class="ty">Packet</span>;
+
+<span class="kw">fn</span> <span class="fn">decode_icmp</span>(epb_data: &amp;[<span class="ty">u8</span>]) {
+    <span class="kw">let</span> eth = <span class="ty">EthernetPacket</span>::<span class="fn">new</span>(epb_data).<span class="fn">unwrap</span>();
+    <span class="kw">if</span> eth.<span class="fn">get_ethertype</span>() != <span class="ty">EtherTypes</span>::Ipv4 { <span class="kw">return</span>; }
+
+    <span class="kw">let</span> ipv4 = <span class="ty">Ipv4Packet</span>::<span class="fn">new</span>(eth.<span class="fn">payload</span>()).<span class="fn">unwrap</span>();
+    <span class="kw">if</span> ipv4.<span class="fn">get_next_level_protocol</span>().<span class="num">0</span> != <span class="num">1</span> { <span class="kw">return</span>; }
+
+    <span class="kw">let</span> icmp = <span class="ty">IcmpPacket</span>::<span class="fn">new</span>(ipv4.<span class="fn">payload</span>()).<span class="fn">unwrap</span>();
+
+    <span class="kw">match</span> icmp.<span class="fn">get_icmp_type</span>() {
+        <span class="ty">IcmpTypes</span>::EchoRequest =&gt; <span class="mac">println!</span>(<span class="str">"Ping"</span>),
+        <span class="ty">IcmpTypes</span>::EchoReply   =&gt; <span class="mac">println!</span>(<span class="str">"Pong"</span>),
+        _ =&gt; {}
+    }
+}</pre>
+
+      <p class="dim">Each <code>::new()</code> takes <code>&amp;[u8]</code> and returns a zero-copy wrapper that reads fields from the underlying bytes by offset.</p>
+    </div>
+
+    <!-- SLIDE 6: Manual decode -->
+    <div class="slide" data-idx="6">
+      <div class="slide-tag">Implementation</div>
+      <h1>Manual decode &mdash; no dependencies</h1>
+      <div class="subtitle">Parsing by raw byte offsets</div>
+
+      <pre><span class="kw">fn</span> <span class="fn">decode_icmp_manual</span>(epb_data: &amp;[<span class="ty">u8</span>]) {
+    <span class="cm">// Ethernet: 14 bytes</span>
+    <span class="kw">let</span> ethertype = <span class="ty">u16</span>::<span class="fn">from_be_bytes</span>([epb_data[<span class="num">12</span>], epb_data[<span class="num">13</span>]]);
+    <span class="kw">if</span> ethertype != <span class="num">0x0800</span> { <span class="kw">return</span>; }
+
+    <span class="cm">// IPv4: variable header length</span>
+    <span class="kw">let</span> ip = &amp;epb_data[<span class="num">14</span>..];
+    <span class="kw">let</span> ihl = ((ip[<span class="num">0</span>] &amp; <span class="num">0x0F</span>) <span class="kw">as</span> <span class="ty">usize</span>) * <span class="num">4</span>;
+    <span class="kw">if</span> ip[<span class="num">9</span>] != <span class="num">1</span> { <span class="kw">return</span>; }   <span class="cm">// protocol != ICMP</span>
+
+    <span class="cm">// ICMP: starts after IP header</span>
+    <span class="kw">let</span> icmp = &amp;ip[ihl..];
+    <span class="kw">let</span> icmp_type = icmp[<span class="num">0</span>];
+    <span class="kw">let</span> icmp_code = icmp[<span class="num">1</span>];
+    <span class="kw">let</span> checksum  = <span class="ty">u16</span>::<span class="fn">from_be_bytes</span>([icmp[<span class="num">2</span>], icmp[<span class="num">3</span>]]);
+
+    <span class="cm">// Echo request (8) or reply (0): ID + sequence follow</span>
+    <span class="kw">if</span> icmp_type == <span class="num">8</span> || icmp_type == <span class="num">0</span> {
+        <span class="kw">let</span> id  = <span class="ty">u16</span>::<span class="fn">from_be_bytes</span>([icmp[<span class="num">4</span>], icmp[<span class="num">5</span>]]);
+        <span class="kw">let</span> seq = <span class="ty">u16</span>::<span class="fn">from_be_bytes</span>([icmp[<span class="num">6</span>], icmp[<span class="num">7</span>]]);
+    }
+}</pre>
+
+      <div class="callout">This is essentially what <code>pnet</code> does internally &mdash; every <code>.get_*()</code> is an offset read into the borrowed <code>&amp;[u8]</code>.</div>
+    </div>
+
+    <!-- SLIDE 7: Packet decode stack -->
+    <div class="slide" data-idx="7">
+      <div class="slide-tag">Architecture</div>
+      <h1>The decode stack</h1>
+      <div class="subtitle">Each layer slices into the next &mdash; no allocation, no copy</div>
+
+      <div class="diagram-box">
+        <svg width="460" height="230" viewBox="0 0 460 230" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .layer { rx: 5; stroke-width: 1.5; }
+            .layer-label { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; }
+            .layer-detail { font-family: 'JetBrains Mono', monospace; font-size: 10px; }
+            .layer-offset { font-family: 'JetBrains Mono', monospace; font-size: 9px; fill: var(--text-dim); }
+          </style>
+
+          <!-- EnhancedPacketBlock -->
+          <rect x="10" y="10" width="440" height="42" class="layer" fill="var(--diagram-fill)" stroke="var(--accent)" stroke-opacity="0.5"/>
+          <text x="30" y="28" class="layer-label" fill="var(--accent)">EnhancedPacketBlock</text>
+          <text x="30" y="42" class="layer-detail" fill="var(--text-dim)">epb_data: &amp;[u8]</text>
+
+          <!-- Ethernet -->
+          <rect x="40" y="60" width="400" height="42" class="layer" fill="var(--diagram-fill)" stroke="var(--diagram-stroke)"/>
+          <text x="60" y="78" class="layer-label" fill="var(--diagram-label)">Ethernet</text>
+          <text x="60" y="92" class="layer-detail" fill="var(--text-dim)">dst[6] + src[6] + ethertype[2] = 14 bytes</text>
+          <text x="430" y="78" class="layer-offset" text-anchor="end">[0..14]</text>
+
+          <line x1="230" y1="52" x2="230" y2="60" stroke="var(--diagram-stroke)" stroke-width="1" marker-end="url(#arrow2)"/>
+
+          <!-- IPv4 -->
+          <rect x="70" y="110" width="360" height="42" class="layer" fill="var(--diagram-fill)" stroke="var(--diagram-stroke)"/>
+          <text x="90" y="128" class="layer-label" fill="var(--diagram-label)">IPv4</text>
+          <text x="90" y="142" class="layer-detail" fill="var(--text-dim)">ihl * 4 bytes &middot; protocol field = ip[9]</text>
+          <text x="420" y="128" class="layer-offset" text-anchor="end">[14..14+ihl*4]</text>
+
+          <line x1="230" y1="102" x2="230" y2="110" stroke="var(--diagram-stroke)" stroke-width="1" marker-end="url(#arrow2)"/>
+
+          <!-- ICMP -->
+          <rect x="100" y="160" width="320" height="42" class="layer" fill="var(--accent-glow)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="120" y="178" class="layer-label" fill="var(--accent)">ICMP</text>
+          <text x="120" y="192" class="layer-detail" fill="var(--text-dim)">type[1] + code[1] + checksum[2] + payload</text>
+          <text x="410" y="178" class="layer-offset" text-anchor="end">&amp;ip[ihl..]</text>
+
+          <line x1="230" y1="152" x2="230" y2="160" stroke="var(--diagram-stroke)" stroke-width="1" marker-end="url(#arrow2)"/>
+
+          <defs><marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="var(--diagram-stroke)"/></marker></defs>
+        </svg>
+      </div>
+
+      <div class="callout">Every layer calls <code>.payload()</code> or uses a range slice &mdash; the original <code>&amp;[u8]</code> is never copied. This is why Rust is a natural fit for packet processing.</div>
+    </div>
+
+    <!-- SLIDE 8: Cargo.toml + summary -->
+    <div class="slide" data-idx="8">
+      <div class="slide-tag">Reference</div>
+      <h1>Quick reference</h1>
+      <div class="subtitle">Dependencies and key takeaways</div>
+
+      <div class="two-col">
+        <div>
+          <h2>Cargo.toml</h2>
+          <pre>[dependencies]
+pcap-parser = <span class="str">"0.15"</span>
+pnet        = <span class="str">"0.35"</span></pre>
+
+          <h2>Key types</h2>
+          <table>
+            <thead><tr><th>Type</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td>&amp;[u8]</td><td class="prose">Borrowed byte slice</td></tr>
+              <tr><td>&amp;mut [u8]</td><td class="prose">Mutable byte slice</td></tr>
+              <tr><td>[u8; N]</td><td class="prose">Fixed-size array</td></tr>
+              <tr><td>Vec&lt;u8&gt;</td><td class="prose">Owned, growable buffer</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h2>Takeaways</h2>
+          <ul>
+            <li><code>&amp;[u8]</code> is a fat pointer: address + length</li>
+            <li><code>[..]</code> coerces arrays into slices</li>
+            <li>Sub-slicing is zero-copy &mdash; just pointer arithmetic</li>
+            <li>Packet parsing chains slices layer by layer</li>
+            <li><code>pnet</code> wraps the offset math; manual decode does the same thing</li>
+            <li><code>u16::from_be_bytes()</code> handles network byte order</li>
+          </ul>
+
+          <h2>Decode chain</h2>
+          <pre><span class="ty">EnhancedPacketBlock</span>
+  &rarr; <span class="ty">EthernetPacket</span>::<span class="fn">new</span>(&amp;data)
+    &rarr; <span class="ty">Ipv4Packet</span>::<span class="fn">new</span>(eth.<span class="fn">payload</span>())
+      &rarr; <span class="ty">IcmpPacket</span>::<span class="fn">new</span>(ip.<span class="fn">payload</span>())</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: Reading pnet crate docs -->
+    <div class="slide" data-idx="9">
+      <div class="slide-tag">Ecosystem</div>
+      <h1>Reading <code>pnet</code> crate docs</h1>
+      <div class="subtitle">Every protocol module follows the same pattern</div>
+
+      <h2>Module structure on docs.rs</h2>
+      <p>Navigate via the breadcrumb: <code>pnet::packet::ethernet</code>. Each protocol module exposes the same set of items:</p>
+
+      <table>
+        <thead><tr><th>Item</th><th>Purpose</th><th>Takes / Returns</th></tr></thead>
+        <tbody>
+          <tr><td><span class="ty">EthernetPacket</span></td><td class="prose">Read-only zero-copy wrapper</td><td>&amp;[u8]</td></tr>
+          <tr><td><span class="ty">MutableEthernetPacket</span></td><td class="prose">Read-write zero-copy wrapper</td><td>&amp;mut [u8]</td></tr>
+          <tr><td><span class="ty">Ethernet</span></td><td class="prose">Owned struct with real fields</td><td class="prose">Rarely used for wire parsing</td></tr>
+          <tr><td><span class="ty">EtherType</span></td><td class="prose">Newtype around u16</td><td class="prose">Wraps ethertype value</td></tr>
+          <tr><td><span class="ty">EtherTypes</span></td><td class="prose">Constants module</td><td class="prose">Ipv4, Ipv6, Arp, ...</td></tr>
+          <tr><td><span class="ty">EthernetIterable</span></td><td class="prose">Iterator over multiple frames</td><td>&amp;[u8]</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Parsing (read a packet)</h2>
+      <pre><span class="kw">let</span> eth = <span class="ty">EthernetPacket</span>::<span class="fn">new</span>(raw_bytes).<span class="fn">unwrap</span>();
+
+eth.<span class="fn">get_destination</span>()   <span class="cm">// [u8; 6] &mdash; dst MAC</span>
+eth.<span class="fn">get_source</span>()        <span class="cm">// [u8; 6] &mdash; src MAC</span>
+eth.<span class="fn">get_ethertype</span>()     <span class="cm">// EtherType</span>
+eth.<span class="fn">payload</span>()           <span class="cm">// &amp;[u8] &mdash; everything after the 14-byte header</span></pre>
+
+      <h2>Building (write a packet)</h2>
+      <pre><span class="kw">let mut</span> buf = [<span class="num">0u8</span>; <span class="num">14</span>];
+<span class="kw">let mut</span> eth = <span class="ty">MutableEthernetPacket</span>::<span class="fn">new</span>(&amp;<span class="kw">mut</span> buf[..]).<span class="fn">unwrap</span>();
+
+eth.<span class="fn">set_destination</span>(<span class="ty">MacAddr</span>::<span class="fn">new</span>(<span class="num">0xff</span>,<span class="num">0xff</span>,<span class="num">0xff</span>,<span class="num">0xff</span>,<span class="num">0xff</span>,<span class="num">0xff</span>));
+eth.<span class="fn">set_source</span>(<span class="ty">MacAddr</span>::<span class="fn">new</span>(<span class="num">0x00</span>,<span class="num">0x1a</span>,<span class="num">0x2b</span>,<span class="num">0x3c</span>,<span class="num">0x4d</span>,<span class="num">0x5e</span>));
+eth.<span class="fn">set_ethertype</span>(<span class="ty">EtherTypes</span>::Ipv4);</pre>
+
+      <div class="callout">This pattern repeats across <code>pnet</code>: <code>ipv4</code> has <code>Ipv4Packet</code> / <code>MutableIpv4Packet</code>, <code>icmp</code> has <code>IcmpPacket</code> / <code>MutableIcmpPacket</code>, etc. Learn one, you know them all.</div>
+    </div>
+
+    <!-- SLIDE 10: Cow<'a, [u8]> -->
+    <div class="slide" data-idx="10">
+      <div class="slide-tag">Ownership</div>
+      <h1><code>Cow&lt;'a, [u8]&gt;</code></h1>
+      <div class="subtitle">Clone on Write &mdash; borrow when you can, own when you must</div>
+
+      <h2>The enum</h2>
+      <pre><span class="kw">pub enum</span> <span class="ty">Cow</span>&lt;<span class="kw">'a</span>, B: ?<span class="ty">Sized</span> + <span class="ty">ToOwned</span>&gt; {
+    <span class="fn">Borrowed</span>(&amp;<span class="kw">'a</span> B),                     <span class="cm">// just a reference</span>
+    <span class="fn">Owned</span>(&lt;B <span class="kw">as</span> <span class="ty">ToOwned</span>&gt;::<span class="ty">Owned</span>),      <span class="cm">// owned copy</span>
+}</pre>
+
+      <h2>For <code>Cow&lt;'a, [u8]&gt;</code></h2>
+      <table>
+        <thead><tr><th>Variant</th><th>Holds</th><th>Cost</th></tr></thead>
+        <tbody>
+          <tr><td><span class="fn">Cow::Borrowed</span>(&amp;'a [u8])</td><td class="prose">Reference to someone else's bytes</td><td class="prose">Zero-copy</td></tr>
+          <tr><td><span class="fn">Cow::Owned</span>(Vec&lt;u8&gt;)</td><td class="prose">Its own Vec&lt;u8&gt;</td><td class="prose">Allocated</td></tr>
+        </tbody>
+      </table>
+
+      <div class="two-col">
+        <div>
+          <h2>Reading &mdash; free either way</h2>
+          <pre><span class="cm">// Cow derefs to &amp;[u8] automatically</span>
+<span class="kw">let</span> first = block.data[<span class="num">0</span>];
+<span class="kw">let</span> slice: &amp;[<span class="ty">u8</span>] = &amp;block.data;
+<span class="kw">let</span> eth = <span class="ty">EthernetPacket</span>::<span class="fn">new</span>(
+    &amp;block.data
+).<span class="fn">unwrap</span>();</pre>
+        </div>
+        <div>
+          <h2>Mutating &mdash; clones only if borrowed</h2>
+          <pre><span class="cm">// .to_mut() clones if Borrowed,</span>
+<span class="cm">// no-op if already Owned</span>
+<span class="kw">let</span> bytes = block.data.<span class="fn">to_mut</span>();
+bytes[<span class="num">0</span>] = <span class="num">0xff</span>;
+
+<span class="cm">// .into_owned() consumes into Vec</span>
+<span class="kw">let</span> v: <span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt; = block.data.<span class="fn">into_owned</span>();</pre>
+        </div>
+      </div>
+
+      <h2>Key methods</h2>
+      <table>
+        <thead><tr><th>Method</th><th>Returns</th><th>Clones?</th></tr></thead>
+        <tbody>
+          <tr><td>&amp;*cow</td><td>&amp;[u8]</td><td class="prose">Never</td></tr>
+          <tr><td>.to_mut()</td><td>&amp;mut Vec&lt;u8&gt;</td><td class="prose">Only if currently Borrowed</td></tr>
+          <tr><td>.into_owned()</td><td>Vec&lt;u8&gt;</td><td class="prose">Only if currently Borrowed</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">Think of it like a library book: <strong>Borrowed</strong> = reading the library's copy (free). <strong>to_mut()</strong> = you need to highlight, so you photocopy first. If you already own it, no photocopy needed.</div>
+    </div>
+
+    <!-- SLIDE 11: Lifetimes 'a -->
+    <div class="slide" data-idx="11">
+      <div class="slide-tag">Deep dive</div>
+      <h1>Lifetimes: <code>'a</code></h1>
+      <div class="subtitle">Compile-time proof that references never dangle</div>
+
+      <pre><span class="cm">// "the returned slice lives at least as long as the input"</span>
+<span class="kw">fn</span> <span class="fn">first_half</span>&lt;<span class="kw">'a</span>&gt;(data: &amp;<span class="kw">'a</span> [<span class="ty">u8</span>]) -&gt; &amp;<span class="kw">'a</span> [<span class="ty">u8</span>] {
+    &amp;data[..data.<span class="fn">len</span>() / <span class="num">2</span>]
+}</pre>
+
+      <h2>The problem Rust solves</h2>
+      <pre><span class="cm">// C &mdash; compiles fine, crashes at runtime (dangling pointer)</span>
+<span class="ty">char</span>* <span class="fn">get_name</span>() {
+    <span class="ty">char</span> buf[<span class="num">64</span>];
+    <span class="fn">sprintf</span>(buf, <span class="str">"hello"</span>);
+    <span class="kw">return</span> buf;  <span class="cm">// buf is dead after return!</span>
+}</pre>
+
+      <h2>Design lineage</h2>
+      <table>
+        <thead><tr><th>Year</th><th>System</th><th>Contribution</th></tr></thead>
+        <tbody>
+          <tr><td class="num">2001</td><td class="prose">Cyclone (Cornell)</td><td class="prose">Region-based memory safety for C &mdash; <code>@region</code> pointers</td></tr>
+          <tr><td class="num">2006</td><td class="prose">Rust started</td><td class="prose">Graydon Hoare at Mozilla, motivated by Firefox memory bugs</td></tr>
+          <tr><td class="num">2012</td><td class="prose">Rust lifetimes</td><td class="prose">Cyclone regions simplified to <code>'a</code> syntax</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">Lifetimes exist <strong>only at compile time</strong> &mdash; zero runtime code generated. The <code>'</code> prefix separates lifetime params from type params: <code>&lt;'a, T&gt;</code>.</div>
+    </div>
+
+    <!-- SLIDE 12: [u8] unsized type -->
+    <div class="slide" data-idx="12">
+      <div class="slide-tag">Deep dive</div>
+      <h1><code>[u8]</code> &mdash; the unsized slice</h1>
+      <div class="subtitle">A dynamically-sized type that always carries its length</div>
+
+      <pre>[<span class="ty">u8</span>; <span class="num">14</span>]   <span class="cm">// Sized &mdash; compiler knows: exactly 14 bytes</span>
+[<span class="ty">u8</span>]       <span class="cm">// Unsized &mdash; length only known at runtime</span>
+
+<span class="kw">let</span> x: [<span class="ty">u8</span>];        <span class="cm">// ERROR: can't live on the stack</span>
+<span class="kw">let</span> x: &amp;[<span class="ty">u8</span>];       <span class="cm">// OK: fat pointer (ptr + len) = 2 words</span>
+<span class="kw">let</span> x: <span class="ty">Box</span>&lt;[<span class="ty">u8</span>]&gt;;   <span class="cm">// OK: pointer to heap</span></pre>
+
+      <h2>The C array problem this fixes</h2>
+      <pre><span class="cm">// C &mdash; arrays decay to pointers, length is lost</span>
+<span class="kw">void</span> <span class="fn">process</span>(<span class="ty">uint8_t</span>* data) {
+    data[<span class="num">999</span>] = <span class="num">0</span>;  <span class="cm">// compiles fine, buffer overflow</span>
+}
+
+<span class="cm">// Rust &mdash; &amp;[u8] always carries the length</span>
+<span class="kw">fn</span> <span class="fn">process</span>(data: &amp;[<span class="ty">u8</span>]) {
+    data[<span class="num">999</span>];  <span class="cm">// bounds check &mdash; panics safely</span>
+}</pre>
+
+      <div class="callout">Rust's <code>[T]</code> is deliberately unsized so it can only exist behind a fat pointer. This makes it <strong>impossible</strong> to lose the length &mdash; the type system enforces it.</div>
+    </div>
+
+    <!-- SLIDE 13: Design philosophy -->
+    <div class="slide" data-idx="13">
+      <div class="slide-tag">Deep dive</div>
+      <h1>Rust's design philosophy</h1>
+      <div class="subtitle">You don't pay for what you don't use</div>
+
+      <h2>Three approaches to memory safety</h2>
+      <table>
+        <thead><tr><th>Language</th><th>Strategy</th><th>Safety</th><th>Runtime cost</th></tr></thead>
+        <tbody>
+          <tr><td>C</td><td class="prose">Trust the programmer</td><td class="prose">None</td><td class="prose">Zero</td></tr>
+          <tr><td>Java / Go</td><td class="prose">Trust the runtime (GC)</td><td class="prose">Full</td><td class="prose">GC pauses + overhead</td></tr>
+          <tr><td>Rust</td><td class="prose">Trust the compiler (lifetimes)</td><td class="prose">Full</td><td class="prose"><strong>Zero</strong></td></tr>
+        </tbody>
+      </table>
+
+      <h2>Reading <code>Cow&lt;'a, [u8]&gt;</code> right to left</h2>
+      <table>
+        <thead><tr><th>Part</th><th>Meaning</th><th>Design reason</th></tr></thead>
+        <tbody>
+          <tr><td>[u8]</td><td class="prose">Sequence of bytes</td><td class="prose">DST &mdash; length unknown at compile time</td></tr>
+          <tr><td>'a</td><td class="prose">Lives at least as long as 'a</td><td class="prose">Compiler proves no dangling reference</td></tr>
+          <tr><td>Cow&lt;...&gt;</td><td class="prose">Either borrowed or owned</td><td class="prose">Clone only when mutation needed</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout"><strong>The core insight:</strong> if you encode ownership rules into the type system, the compiler proves memory safety at compile time, with zero runtime overhead. Every piece of syntax &mdash; <code>'a</code>, <code>&amp;</code>, <code>[T]</code>, <code>Cow</code> &mdash; is a building block in that proof system.</div>
+    </div>
+
+    <!-- SLIDE 14: Passing Cow to &[u8] -->
+    <div class="slide" data-idx="14">
+      <div class="slide-tag">Patterns</div>
+      <h1>Passing <code>Cow</code> to <code>fn f(&amp;[u8])</code></h1>
+      <div class="subtitle">Deref coercion &mdash; the compiler inserts .deref() for you</div>
+
+      <div class="two-col">
+        <div>
+          <h2>The simple answer</h2>
+          <pre><span class="kw">fn</span> <span class="fn">decode</span>(var: &amp;[<span class="ty">u8</span>]) { <span class="cm">/* ... */</span> }
+
+<span class="cm">// All three work &mdash; pick the first</span>
+<span class="fn">decode</span>(&amp;block.data);          <span class="cm">// idiomatic</span>
+<span class="fn">decode</span>(&amp;*block.data);         <span class="cm">// explicit deref</span>
+<span class="fn">decode</span>(block.data.<span class="fn">as_ref</span>()); <span class="cm">// via AsRef</span></pre>
+
+          <h2>Anything that holds bytes works</h2>
+          <table>
+            <thead><tr><th>Source</th><th>Pass as</th><th>Cost</th></tr></thead>
+            <tbody>
+              <tr><td>Cow&lt;[u8]&gt;</td><td>&amp;cow</td><td class="prose">Free</td></tr>
+              <tr><td>Vec&lt;u8&gt;</td><td>&amp;vec</td><td class="prose">Free</td></tr>
+              <tr><td>[u8; N]</td><td>&amp;array</td><td class="prose">Free</td></tr>
+              <tr><td>&amp;[u8]</td><td class="prose">directly</td><td class="prose">Already correct</td></tr>
+              <tr><td>Box&lt;[u8]&gt;</td><td>&amp;boxed</td><td class="prose">Free</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h2>When you can't just use &amp;</h2>
+          <table>
+            <thead><tr><th>Function wants</th><th>How</th><th>Clones?</th></tr></thead>
+            <tbody>
+              <tr><td>&amp;[u8]</td><td>&amp;cow</td><td class="prose">Never</td></tr>
+              <tr><td>&amp;mut [u8]</td><td>cow.to_mut()</td><td class="prose">If Borrowed</td></tr>
+              <tr><td>Vec&lt;u8&gt;</td><td>cow.into_owned()</td><td class="prose">If Borrowed</td></tr>
+            </tbody>
+          </table>
+
+          <h2>The rule</h2>
+          <pre><span class="cm">// Functions should accept the most</span>
+<span class="cm">// general type that works.</span>
+<span class="cm">//</span>
+<span class="cm">// &amp;[u8] is more general than</span>
+<span class="cm">// &amp;Vec&lt;u8&gt; or &amp;Cow&lt;[u8]&gt;</span>
+<span class="cm">//</span>
+<span class="cm">// because anything holding bytes</span>
+<span class="cm">// can produce &amp;[u8] via Deref.</span>
+
+<span class="kw">fn</span> <span class="fn">good</span>(data: &amp;[<span class="ty">u8</span>]) {}     <span class="cm">// accepts all</span>
+<span class="kw">fn</span> <span class="fn">bad</span>(data: &amp;<span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt;) {}   <span class="cm">// only Vec</span></pre>
+        </div>
+      </div>
+
+      <div class="callout"><strong>Deref coercion:</strong> when a function expects <code>&amp;T</code> and you pass <code>&amp;U</code> where <code>U: Deref&lt;Target = T&gt;</code>, the compiler auto-inserts <code>.deref()</code>. This is why <code>&amp;cow</code>, <code>&amp;vec</code>, and <code>&amp;array</code> all just work.</div>
+    </div>
+
+    <!-- SLIDE 15: EtherType human-readable -->
+    <div class="slide" data-idx="15">
+      <div class="slide-tag">Practical</div>
+      <h1>Making <code>EtherType</code> readable</h1>
+      <div class="subtitle">EtherType(2048) &rarr; "IPv4"</div>
+
+      <div class="two-col">
+        <div>
+          <h2>Match on pnet constants</h2>
+          <pre><span class="kw">let</span> name = <span class="kw">match</span> eth.<span class="fn">get_ethertype</span>() {
+    <span class="ty">EtherTypes</span>::Ipv4 =&gt; <span class="str">"IPv4"</span>,
+    <span class="ty">EtherTypes</span>::Ipv6 =&gt; <span class="str">"IPv6"</span>,
+    <span class="ty">EtherTypes</span>::Arp  =&gt; <span class="str">"ARP"</span>,
+    <span class="ty">EtherTypes</span>::Vlan =&gt; <span class="str">"VLAN"</span>,
+    <span class="ty">EtherTypes</span>::Lldp =&gt; <span class="str">"LLDP"</span>,
+    other =&gt; {
+        <span class="mac">println!</span>(<span class="str">"0x{:04x}"</span>, other.<span class="num">0</span>);
+        <span class="str">"Unknown"</span>
+    }
+};</pre>
+
+          <h2>Access the raw u16</h2>
+          <pre><span class="kw">let</span> et = eth.<span class="fn">get_ethertype</span>();
+<span class="mac">println!</span>(<span class="str">"{}"</span>, et.<span class="num">0</span>);        <span class="cm">// 2048</span>
+<span class="mac">println!</span>(<span class="str">"0x{:04x}"</span>, et.<span class="num">0</span>); <span class="cm">// 0x0800</span></pre>
+          <p class="dim"><code>.0</code> accesses the inner <code>u16</code> of the <code>EtherType</code> newtype wrapper.</p>
+        </div>
+        <div>
+          <h2>Common EtherType values</h2>
+          <table>
+            <thead><tr><th>Decimal</th><th>Hex</th><th>Protocol</th></tr></thead>
+            <tbody>
+              <tr><td>2048</td><td>0x0800</td><td class="prose">IPv4</td></tr>
+              <tr><td>2054</td><td>0x0806</td><td class="prose">ARP</td></tr>
+              <tr><td>33024</td><td>0x8100</td><td class="prose">VLAN (802.1Q)</td></tr>
+              <tr><td>34525</td><td>0x86DD</td><td class="prose">IPv6</td></tr>
+              <tr><td>35020</td><td>0x88CC</td><td class="prose">LLDP</td></tr>
+              <tr><td>35374</td><td>0x8A2E</td><td class="prose">MACsec</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="callout"><code>EtherType</code> is a <strong>newtype</strong> &mdash; a single-field tuple struct wrapping <code>u16</code>. This pattern gives type safety (can't accidentally pass a port number as an ethertype) while <code>.0</code> gives escape-hatch access to the raw value.</div>
+    </div>
+
+  </div>
+
+  <nav>
+    <button class="nav-btn" id="prev" aria-label="Previous slide">&#8592;</button>
+    <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+    <span class="nav-counter" id="counter">1 / 16</span>
+    <button class="nav-btn" id="next" aria-label="Next slide">&#8594;</button>
+  </nav>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+
+  function show(idx) {
+    if (idx < 0 || idx >= total) return;
+    slides[current].classList.remove('active');
+    current = idx;
+    slides[current].classList.add('active');
+    document.getElementById('counter').textContent = `${current + 1} / ${total}`;
+    document.getElementById('progress').style.width = `${((current + 1) / total) * 100}%`;
+  }
+
+  document.getElementById('prev').addEventListener('click', () => show(current - 1));
+  document.getElementById('next').addEventListener('click', () => show(current + 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); show(current + 1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); show(current - 1); }
+    if (e.key === 'Home') { e.preventDefault(); show(0); }
+    if (e.key === 'End') { e.preventDefault(); show(total - 1); }
+  });
+
+  let touchStartX = 0;
+  document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+  document.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 50) { dx < 0 ? show(current + 1) : show(current - 1); }
+  });
+
+  show(0);
+</script>

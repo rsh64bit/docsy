@@ -1,0 +1,790 @@
+<title>Endianness & Wire Protocols</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&family=Fraunces:ital,wght@0,700;1,400&display=swap');
+
+  :root {
+    --bg: #0b0e14;
+    --surface: #12161f;
+    --surface-raised: #1a1f2b;
+    --border: #252b3a;
+    --text: #d4d8e4;
+    --text-dim: #6b7394;
+    --accent: #5ea4f8;
+    --accent-glow: rgba(94, 164, 248, 0.1);
+    --warn: #f5a623;
+    --warn-glow: rgba(245, 166, 35, 0.1);
+    --ok: #4ecb71;
+    --ok-glow: rgba(78, 203, 113, 0.1);
+    --err: #f55b6a;
+    --err-glow: rgba(245, 91, 106, 0.1);
+    --keyword: #c792ea;
+    --type: #82aaff;
+    --number: #f78c6c;
+    --string: #c3e88d;
+    --comment: #546e8a;
+    --fn: #82aaff;
+    --tag-bg: rgba(94, 164, 248, 0.08);
+    --tag-border: rgba(94, 164, 248, 0.2);
+    --tag-text: #5ea4f8;
+    --nav-bg: rgba(11, 14, 20, 0.94);
+    --table-header: #141924;
+    --table-alt: rgba(26, 31, 43, 0.5);
+    --diagram-stroke: #3a4260;
+    --diagram-fill: #141924;
+    --le-color: #5ea4f8;
+    --be-color: #f5a623;
+    --wire-color: #4ecb71;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f5f4f1;
+      --surface: #ffffff;
+      --surface-raised: #edecea;
+      --border: #d8d5cf;
+      --text: #1c1c1c;
+      --text-dim: #71706b;
+      --accent: #2b6cb8;
+      --accent-glow: rgba(43, 108, 184, 0.07);
+      --warn: #b8751a;
+      --warn-glow: rgba(184, 117, 26, 0.07);
+      --ok: #2a8c47;
+      --ok-glow: rgba(42, 140, 71, 0.07);
+      --err: #c53845;
+      --err-glow: rgba(197, 56, 69, 0.07);
+      --keyword: #7c3aed;
+      --type: #2b6cb8;
+      --number: #c4550a;
+      --string: #3a7d12;
+      --comment: #9ca3af;
+      --fn: #2b6cb8;
+      --tag-bg: rgba(43, 108, 184, 0.06);
+      --tag-border: rgba(43, 108, 184, 0.18);
+      --tag-text: #2b6cb8;
+      --nav-bg: rgba(245, 244, 241, 0.94);
+      --table-header: #e8e6e2;
+      --table-alt: rgba(237, 236, 234, 0.5);
+      --diagram-stroke: #bbb8b2;
+      --diagram-fill: #edecea;
+      --le-color: #2b6cb8;
+      --be-color: #b8751a;
+      --wire-color: #2a8c47;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e14;
+    --surface: #12161f;
+    --surface-raised: #1a1f2b;
+    --border: #252b3a;
+    --text: #d4d8e4;
+    --text-dim: #6b7394;
+    --accent: #5ea4f8;
+    --accent-glow: rgba(94, 164, 248, 0.1);
+    --warn: #f5a623;
+    --warn-glow: rgba(245, 166, 35, 0.1);
+    --ok: #4ecb71;
+    --ok-glow: rgba(78, 203, 113, 0.1);
+    --err: #f55b6a;
+    --err-glow: rgba(245, 91, 106, 0.1);
+    --keyword: #c792ea;
+    --type: #82aaff;
+    --number: #f78c6c;
+    --string: #c3e88d;
+    --comment: #546e8a;
+    --fn: #82aaff;
+    --tag-bg: rgba(94, 164, 248, 0.08);
+    --tag-border: rgba(94, 164, 248, 0.2);
+    --tag-text: #5ea4f8;
+    --nav-bg: rgba(11, 14, 20, 0.94);
+    --table-header: #141924;
+    --table-alt: rgba(26, 31, 43, 0.5);
+    --diagram-stroke: #3a4260;
+    --diagram-fill: #141924;
+    --le-color: #5ea4f8;
+    --be-color: #f5a623;
+    --wire-color: #4ecb71;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .deck { height: 100%; display: flex; flex-direction: column; }
+  .viewport { flex: 1; overflow: hidden; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    padding: 2.5rem 3rem 2rem;
+    display: none; flex-direction: column;
+    opacity: 0; transition: opacity 0.25s ease;
+    overflow-y: auto;
+  }
+  .slide.active { display: flex; opacity: 1; }
+
+  .tag {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.68rem; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--tag-text); background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    padding: 0.2em 0.65em; border-radius: 3px;
+    margin-bottom: 1rem; width: fit-content;
+  }
+  .tag svg { width: 12px; height: 12px; fill: var(--tag-text); }
+
+  h1 {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 2.2rem; font-weight: 800; line-height: 1.15;
+    text-wrap: balance; margin-bottom: 0.3rem; letter-spacing: -0.03em;
+  }
+  h1 .le { color: var(--le-color); }
+  h1 .be { color: var(--be-color); }
+  h1 .wire { color: var(--wire-color); }
+  h1 .err { color: var(--err); }
+
+  .sub {
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic; font-weight: 400;
+    color: var(--text-dim); font-size: 1rem; margin-bottom: 1.6rem;
+  }
+
+  h2 {
+    font-size: 0.95rem; font-weight: 700; color: var(--accent);
+    margin: 1.4rem 0 0.6rem; letter-spacing: 0.01em;
+    text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.06em;
+  }
+  h2:first-of-type { margin-top: 0; }
+
+  p { max-width: 64ch; margin-bottom: 0.7rem; }
+  p.dim { color: var(--text-dim); font-size: 0.88rem; }
+
+  code {
+    font-family: 'Fira Code', monospace; font-size: 0.85em;
+    background: var(--surface); padding: 0.12em 0.35em;
+    border-radius: 3px; color: var(--type);
+  }
+
+  pre {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1rem 1.2rem; overflow-x: auto;
+    margin-bottom: 0.9rem; font-family: 'Fira Code', monospace;
+    font-size: 0.78rem; line-height: 1.7;
+  }
+
+  .kw { color: var(--keyword); font-weight: 500; }
+  .ty { color: var(--type); }
+  .num { color: var(--number); }
+  .str { color: var(--string); }
+  .cm { color: var(--comment); font-style: italic; }
+  .fn { color: var(--fn); }
+
+  table { border-collapse: collapse; width: 100%; max-width: 54rem; font-size: 0.85rem; margin-bottom: 0.9rem; }
+  thead { background: var(--table-header); }
+  th { text-align: left; font-weight: 600; padding: 0.5rem 0.9rem; border-bottom: 2px solid var(--border); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); }
+  td { padding: 0.45rem 0.9rem; border-bottom: 1px solid var(--border); }
+  td.mono { font-family: 'Fira Code', monospace; font-size: 0.8rem; }
+  td.prose { font-family: 'Inter', system-ui, sans-serif; }
+  tbody tr:nth-child(even) { background: var(--table-alt); }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+  .box {
+    padding: 0.75rem 1rem; border-radius: 5px;
+    margin-bottom: 0.8rem; font-size: 0.88rem;
+  }
+  .box.info { background: var(--accent-glow); border-left: 3px solid var(--accent); }
+  .box.warn { background: var(--warn-glow); border-left: 3px solid var(--warn); }
+  .box.ok { background: var(--ok-glow); border-left: 3px solid var(--ok); }
+  .box.err { background: var(--err-glow); border-left: 3px solid var(--err); }
+  .box code { background: transparent; }
+
+  .mem-row {
+    display: flex; gap: 2px; margin-bottom: 0.3rem; align-items: center;
+  }
+  .mem-cell {
+    display: flex; align-items: center; justify-content: center;
+    width: 44px; height: 36px; border-radius: 4px;
+    font-family: 'Fira Code', monospace; font-size: 0.78rem; font-weight: 600;
+    border: 1.5px solid var(--border); background: var(--diagram-fill);
+  }
+  .mem-cell.le { border-color: var(--le-color); color: var(--le-color); }
+  .mem-cell.be { border-color: var(--be-color); color: var(--be-color); }
+  .mem-cell.wire { border-color: var(--wire-color); color: var(--wire-color); }
+  .mem-cell.neutral { border-color: var(--text-dim); color: var(--text); }
+  .mem-cell.highlight { background: var(--accent-glow); }
+  .mem-label {
+    font-family: 'Fira Code', monospace; font-size: 0.68rem;
+    color: var(--text-dim); min-width: 4.5rem; text-align: right;
+    padding-right: 0.6rem;
+  }
+  .mem-addr {
+    font-family: 'Fira Code', monospace; font-size: 0.62rem;
+    color: var(--text-dim); text-align: center; width: 44px;
+  }
+
+  .bit-row { display: flex; gap: 1px; margin-bottom: 0.15rem; }
+  .bit-cell {
+    display: flex; align-items: center; justify-content: center;
+    width: 28px; height: 26px; border-radius: 3px;
+    font-family: 'Fira Code', monospace; font-size: 0.72rem; font-weight: 500;
+    background: var(--diagram-fill); border: 1px solid var(--border);
+  }
+  .bit-cell.on { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+  .bit-label {
+    font-family: 'Fira Code', monospace; font-size: 0.58rem;
+    color: var(--text-dim); text-align: center; width: 28px;
+  }
+  .field-bracket {
+    font-family: 'Fira Code', monospace; font-size: 0.68rem;
+    color: var(--accent); text-align: center; padding: 0.15rem 0;
+  }
+
+  .vs-badge {
+    display: inline-block; padding: 0.15em 0.5em; border-radius: 3px;
+    font-family: 'Fira Code', monospace; font-size: 0.72rem; font-weight: 600;
+  }
+  .vs-badge.le { background: rgba(94,164,248,0.12); color: var(--le-color); }
+  .vs-badge.be { background: rgba(245,166,35,0.12); color: var(--be-color); }
+  .vs-badge.wire { background: rgba(78,203,113,0.12); color: var(--wire-color); }
+  .vs-badge.bad { background: rgba(245,91,106,0.12); color: var(--err); }
+
+  ul { padding-left: 1.2rem; margin-bottom: 0.7rem; }
+  li { margin-bottom: 0.25rem; max-width: 62ch; }
+
+  .title-slide { justify-content: center; align-items: center; text-align: center; }
+  .title-slide h1 { font-size: 2.8rem; margin-bottom: 0.5rem; }
+  .title-slide .sub { font-size: 1.1rem; margin-bottom: 0; }
+  .title-slide .deck-meta {
+    margin-top: 2rem; font-size: 0.78rem; color: var(--text-dim);
+    font-family: 'Fira Code', monospace;
+  }
+  .title-icon {
+    width: 64px; height: 64px; margin-bottom: 1.5rem;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 14px; background: var(--accent-glow);
+    border: 1.5px solid var(--accent);
+  }
+  .title-icon svg { width: 32px; height: 32px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  nav {
+    background: var(--nav-bg); border-top: 1px solid var(--border);
+    padding: 0.55rem 1.5rem;
+    padding-bottom: calc(0.55rem + env(safe-area-inset-bottom, 0px));
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .progress { flex: 1; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.25s ease; }
+  .counter { font-family: 'Fira Code', monospace; font-size: 0.72rem; color: var(--text-dim); min-width: 3.5rem; text-align: center; font-variant-numeric: tabular-nums; }
+  .btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
+    width: 2rem; height: 2rem; border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s, color 0.15s; font-size: 0.9rem;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 700px) {
+    .slide { padding: 1.8rem 1.1rem 1.5rem; }
+    h1 { font-size: 1.6rem; }
+    .title-slide h1 { font-size: 2rem; }
+    .cols { grid-template-columns: 1fr; gap: 0.8rem; }
+    pre { font-size: 0.72rem; padding: 0.75rem; }
+    .mem-cell { width: 36px; height: 30px; font-size: 0.7rem; }
+    .bit-cell { width: 22px; height: 22px; font-size: 0.64rem; }
+    table { font-size: 0.78rem; }
+  }
+</style>
+
+<div class="deck">
+  <div class="viewport">
+
+    <!-- 0: TITLE -->
+    <div class="slide title-slide active" data-i="0">
+      <div class="title-icon">
+        <svg viewBox="0 0 24 24"><path d="M7 4v16M17 4v16M4 7h16M4 12h16M4 17h16"/></svg>
+      </div>
+      <h1>Endianness &amp; Wire Protocols</h1>
+      <div class="sub">From byte order fundamentals to bitfield traps on RISC-V</div>
+      <div class="deck-meta">13 slides &middot; for embedded firmware engineers</div>
+    </div>
+
+    <!-- 1: WHAT IS ENDIANNESS -->
+    <div class="slide" data-i="1">
+      <div class="tag"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none" stroke-width="2"/><path d="M12 8v4l2 2" stroke="currentColor" fill="none" stroke-width="2"/></svg> Fundamentals</div>
+      <h1>What is endianness?</h1>
+      <div class="sub">The order CPUs store multi-byte integers in memory</div>
+
+      <div class="cols">
+        <div>
+          <h2><span class="vs-badge le">Little-Endian</span> &mdash; RISC-V, x86, ARM</h2>
+          <p>LSB (least significant byte) at the <strong>lowest</strong> address.</p>
+          <p class="dim">The "little end" comes first.</p>
+          <pre><span class="ty">uint16_t</span> val = <span class="num">0x0800</span>;
+
+Addr   Value
+0x1000 [<span class="num">00</span>] &larr; LSB first
+0x1001 [<span class="num">08</span>] &larr; MSB</pre>
+        </div>
+        <div>
+          <h2><span class="vs-badge be">Big-Endian</span> &mdash; Network, PowerPC</h2>
+          <p>MSB (most significant byte) at the <strong>lowest</strong> address.</p>
+          <p class="dim">The "big end" comes first. Matches how you write it.</p>
+          <pre><span class="ty">uint16_t</span> val = <span class="num">0x0800</span>;
+
+Addr   Value
+0x1000 [<span class="num">08</span>] &larr; MSB first
+0x1001 [<span class="num">00</span>] &larr; LSB</pre>
+        </div>
+      </div>
+
+      <div class="box info">Endianness only affects <strong>multi-byte integers</strong> (<code>uint16_t</code>, <code>uint32_t</code>, <code>uint64_t</code>). Byte arrays are identical on both architectures.</div>
+    </div>
+
+    <!-- 2: UINT16 LAYOUT -->
+    <div class="slide" data-i="2">
+      <div class="tag"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><path d="M3 9h18M9 3v18" stroke="currentColor" fill="none" stroke-width="2"/></svg> Memory layout</div>
+      <h1><code>uint16_t</code> in memory</h1>
+      <div class="sub">Two bytes, two possible orderings</div>
+
+      <pre><span class="ty">uint16_t</span> val = <span class="num">0x0800</span>;   <span class="cm">// IPv4 EtherType</span>
+                  ^^  ^^
+                 MSB  LSB</pre>
+
+      <div class="cols">
+        <div>
+          <h2><span class="vs-badge le">Little-Endian</span></h2>
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <div class="mem-addr">0x1000</div><div class="mem-addr">0x1001</div>
+          </div>
+          <div class="mem-row">
+            <div class="mem-cell le">00</div><div class="mem-cell le">08</div>
+          </div>
+          <p class="dim" style="margin-top:0.4rem">LSB first &mdash; reversed from how you write it</p>
+        </div>
+        <div>
+          <h2><span class="vs-badge be">Big-Endian</span></h2>
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <div class="mem-addr">0x1000</div><div class="mem-addr">0x1001</div>
+          </div>
+          <div class="mem-row">
+            <div class="mem-cell be">08</div><div class="mem-cell be">00</div>
+          </div>
+          <p class="dim" style="margin-top:0.4rem">MSB first &mdash; matches paper notation</p>
+        </div>
+      </div>
+
+      <h2>After <code>htons()</code> on little-endian</h2>
+      <div style="display:flex;gap:4px;margin-bottom:4px">
+        <div class="mem-addr">0x1000</div><div class="mem-addr">0x1001</div>
+      </div>
+      <div class="mem-row">
+        <div class="mem-cell wire">08</div><div class="mem-cell wire">00</div>
+      </div>
+      <div class="box ok"><code>htons()</code> swaps bytes in the register so little-endian memory matches wire order.</div>
+    </div>
+
+    <!-- 3: UINT32 LAYOUT -->
+    <div class="slide" data-i="3">
+      <div class="tag"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" fill="none" stroke-width="2"/><path d="M3 9h18M9 3v18M15 3v18" stroke="currentColor" fill="none" stroke-width="2"/></svg> Memory layout</div>
+      <h1><code>uint32_t</code> in memory</h1>
+      <div class="sub">Four bytes &mdash; same rule, more to reverse</div>
+
+      <pre><span class="ty">uint32_t</span> val = <span class="num">0x00CCDEAD</span>;
+                  ^^  ^^  ^^  ^^
+                 MSB            LSB</pre>
+
+      <div class="cols">
+        <div>
+          <h2><span class="vs-badge le">Little-Endian</span> (RISC-V)</h2>
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <div class="mem-addr">0x2000</div><div class="mem-addr">0x2001</div><div class="mem-addr">0x2002</div><div class="mem-addr">0x2003</div>
+          </div>
+          <div class="mem-row">
+            <div class="mem-cell le">AD</div><div class="mem-cell le">DE</div><div class="mem-cell le">CC</div><div class="mem-cell le">00</div>
+          </div>
+          <p class="dim" style="margin-top:0.4rem">LSB (AD) at lowest address</p>
+        </div>
+        <div>
+          <h2><span class="vs-badge be">Big-Endian</span></h2>
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <div class="mem-addr">0x2000</div><div class="mem-addr">0x2001</div><div class="mem-addr">0x2002</div><div class="mem-addr">0x2003</div>
+          </div>
+          <div class="mem-row">
+            <div class="mem-cell be">00</div><div class="mem-cell be">CC</div><div class="mem-cell be">DE</div><div class="mem-cell be">AD</div>
+          </div>
+          <p class="dim" style="margin-top:0.4rem">MSB (00) at lowest address</p>
+        </div>
+      </div>
+
+      <div class="box info"><code>uint32_t</code> is always 4 bytes. <code>0xCCDEAD</code> is really <code>0x00CCDEAD</code> &mdash; the compiler pads the top byte with <code>0x00</code>.</div>
+    </div>
+
+    <!-- 4: BYTE ARRAYS DON'T CARE -->
+    <div class="slide" data-i="4">
+      <div class="tag"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Key insight</div>
+      <h1>Byte arrays are endianness-free</h1>
+      <div class="sub">uint8_t[] is addressed byte-by-byte &mdash; same on all CPUs</div>
+
+      <pre><span class="ty">uint8_t</span> mac[<span class="num">6</span>] = {<span class="num">0xAA</span>, <span class="num">0xBB</span>, <span class="num">0xCC</span>, <span class="num">0xDD</span>, <span class="num">0xEE</span>, <span class="num">0xFF</span>};</pre>
+
+      <div class="cols">
+        <div>
+          <h2><span class="vs-badge le">Little-Endian</span></h2>
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <div class="mem-addr">0x1000</div><div class="mem-addr">0x1001</div><div class="mem-addr">0x1002</div><div class="mem-addr">0x1003</div><div class="mem-addr">0x1004</div><div class="mem-addr">0x1005</div>
+          </div>
+          <div class="mem-row">
+            <div class="mem-cell neutral">AA</div><div class="mem-cell neutral">BB</div><div class="mem-cell neutral">CC</div><div class="mem-cell neutral">DD</div><div class="mem-cell neutral">EE</div><div class="mem-cell neutral">FF</div>
+          </div>
+        </div>
+        <div>
+          <h2><span class="vs-badge be">Big-Endian</span></h2>
+          <div style="display:flex;gap:4px;margin-bottom:4px">
+            <div class="mem-addr">0x1000</div><div class="mem-addr">0x1001</div><div class="mem-addr">0x1002</div><div class="mem-addr">0x1003</div><div class="mem-addr">0x1004</div><div class="mem-addr">0x1005</div>
+          </div>
+          <div class="mem-row">
+            <div class="mem-cell neutral">AA</div><div class="mem-cell neutral">BB</div><div class="mem-cell neutral">CC</div><div class="mem-cell neutral">DD</div><div class="mem-cell neutral">EE</div><div class="mem-cell neutral">FF</div>
+          </div>
+        </div>
+      </div>
+
+      <h2>The rule</h2>
+      <table>
+        <thead><tr><th>Type</th><th>Endianness matters?</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">uint8_t[], char[]</td><td class="prose"><strong>No</strong></td><td class="prose">Byte-addressed, always same layout</td></tr>
+          <tr><td class="mono">uint16_t</td><td class="prose"><strong>Yes</strong> &mdash; <code>htons()</code></td><td class="prose">2-byte integer, order differs</td></tr>
+          <tr><td class="mono">uint32_t</td><td class="prose"><strong>Yes</strong> &mdash; <code>htonl()</code></td><td class="prose">4-byte integer, order differs</td></tr>
+          <tr><td class="mono">struct of uint8_t[]</td><td class="prose"><strong>No</strong></td><td class="prose">Just bytes in sequence</td></tr>
+          <tr><td class="mono">struct with mixed</td><td class="prose"><strong>Only integer fields</strong></td><td class="prose">Byte arrays fine, integers need swap</td></tr>
+        </tbody>
+      </table>
+
+      <div class="box ok">Mental model: <strong>can you index it with <code>[i]</code>?</strong> &rarr; no endianness. <strong>Does the CPU load it as one value?</strong> &rarr; endianness matters.</div>
+    </div>
+
+    <!-- 5: WHY LE EXISTS -->
+    <div class="slide" data-i="5">
+      <div class="tag"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" fill="none" stroke-width="2"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01" stroke="currentColor" fill="none" stroke-width="2"/></svg> Why?</div>
+      <h1>Why does <span class="le">little-endian</span> exist?</h1>
+      <div class="sub">It's a hardware optimization, not a mistake</div>
+
+      <h2>The type-casting advantage</h2>
+      <pre><span class="ty">uint8_t</span>  val8  = <span class="num">0x08</span>;
+<span class="ty">uint16_t</span> val16 = <span class="num">0x0008</span>;
+<span class="ty">uint32_t</span> val32 = <span class="num">0x00000008</span>;</pre>
+
+      <div class="cols">
+        <div>
+          <h2><span class="vs-badge le">Little-Endian</span> &mdash; same address works</h2>
+          <pre>Addr    u8      u16         u32
+0x1000  [08]    [08][00]    [08][00][00][00]
+         &uarr;       &uarr;           &uarr;
+         same address, same value byte</pre>
+          <p class="dim">Cast between sizes without shifting. Hardware is simpler.</p>
+        </div>
+        <div>
+          <h2><span class="vs-badge be">Big-Endian</span> &mdash; address shifts</h2>
+          <pre>Addr    u8      u16         u32
+0x1000  [08]    [00][08]    [00][00][00][08]
+         &uarr;            &uarr;                  &uarr;
+         different positions each time</pre>
+          <p class="dim">Widening requires address adjustment. More hardware logic.</p>
+        </div>
+      </div>
+
+      <h2>Why the wire is big-endian</h2>
+      <div class="box info"><strong>Human-readable:</strong> 0x0800 appears as [08][00] &mdash; same as you write it. Early ARPANET (1970s) chose this so the most significant bits arrive first, enabling classify-while-receiving.</div>
+    </div>
+
+    <!-- 6: MSB vs MSb -->
+    <div class="slide" data-i="6">
+      <div class="tag"><svg viewBox="0 0 24 24"><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg> Terminology</div>
+      <h1>MS<span class="be">B</span> vs MS<span class="le">b</span></h1>
+      <div class="sub">Byte vs bit &mdash; two different scopes</div>
+
+      <pre><span class="cm">// EtherType = 0x0800</span>
+
+              MSB          LSB
+              (Byte)       (Byte)
+              &darr;            &darr;
+              <span class="num">0x08</span>         <span class="num">0x00</span>
+
+<span class="cm">// Zoom into the MSB byte (0x08):</span>
+
+Bit:   7  6  5  4  3  2  1  0
+       0  0  0  0  1  0  0  0
+       &uarr;                    &uarr;
+      MSb                   LSb
+      (most significant     (least significant
+       BIT of this byte)     BIT of this byte)</pre>
+
+      <table>
+        <thead><tr><th>Term</th><th>Stands for</th><th>Scope</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">MSB</td><td class="prose">Most Significant <strong>Byte</strong></td><td class="prose">Among bytes in a multi-byte value</td></tr>
+          <tr><td class="mono">LSB</td><td class="prose">Least Significant <strong>Byte</strong></td><td class="prose">Among bytes in a multi-byte value</td></tr>
+          <tr><td class="mono">MSb</td><td class="prose">Most Significant <strong>bit</strong></td><td class="prose">Within a single byte</td></tr>
+          <tr><td class="mono">LSb</td><td class="prose">Least Significant <strong>bit</strong></td><td class="prose">Within a single byte</td></tr>
+        </tbody>
+      </table>
+
+      <div class="box info"><strong>Endianness = byte order.</strong> Bit order within a byte is always the same. The wire sends MSb of MSB first, LSb of LSB last.</div>
+    </div>
+
+    <!-- 7: ETHERNET HEADER -->
+    <div class="slide" data-i="7">
+      <div class="tag"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Ethernet</div>
+      <h1>Zephyr <code>net_eth_hdr</code></h1>
+      <div class="sub">14 bytes &mdash; the struct maps directly onto the wire</div>
+
+      <pre><span class="kw">struct</span> <span class="ty">net_eth_hdr</span> {
+    <span class="kw">struct</span> <span class="ty">net_eth_addr</span> dst;   <span class="cm">/* uint8_t[6] — NO swap  */</span>
+    <span class="kw">struct</span> <span class="ty">net_eth_addr</span> src;   <span class="cm">/* uint8_t[6] — NO swap  */</span>
+    <span class="ty">uint16_t</span> type;             <span class="cm">/* uint16_t   — YES, htons() */</span>
+} __packed;</pre>
+
+      <h2>Memory layout on RISC-V (after htons)</h2>
+      <div style="display:flex;gap:4px;margin-bottom:4px;flex-wrap:wrap">
+        <div class="mem-addr">+0</div><div class="mem-addr">+1</div><div class="mem-addr">+2</div><div class="mem-addr">+3</div><div class="mem-addr">+4</div><div class="mem-addr">+5</div><div class="mem-addr">+6</div><div class="mem-addr">+7</div><div class="mem-addr">+8</div><div class="mem-addr">+9</div><div class="mem-addr">+10</div><div class="mem-addr">+11</div><div class="mem-addr">+12</div><div class="mem-addr">+13</div>
+      </div>
+      <div class="mem-row" style="flex-wrap:wrap">
+        <div class="mem-cell neutral">AA</div><div class="mem-cell neutral">BB</div><div class="mem-cell neutral">CC</div><div class="mem-cell neutral">DD</div><div class="mem-cell neutral">EE</div><div class="mem-cell neutral">FF</div><div class="mem-cell neutral">11</div><div class="mem-cell neutral">22</div><div class="mem-cell neutral">33</div><div class="mem-cell neutral">44</div><div class="mem-cell neutral">55</div><div class="mem-cell neutral">66</div><div class="mem-cell wire">08</div><div class="mem-cell wire">00</div>
+      </div>
+      <div style="display:flex;gap:2px;font-size:0.68rem;color:var(--text-dim);font-family:'Fira Code',monospace;margin-top:0.3rem;flex-wrap:wrap">
+        <span style="width:276px;text-align:center">dst MAC (6 bytes)</span>
+        <span style="width:276px;text-align:center">src MAC (6 bytes)</span>
+        <span style="width:90px;text-align:center;color:var(--wire-color)">type</span>
+      </div>
+
+      <div class="box ok" style="margin-top:1rem">MAC addresses are <code>uint8_t[6]</code> &mdash; no swap. Only the <code>uint16_t type</code> field needs <code>htons()</code>. DMA pushes these bytes left-to-right onto the wire.</div>
+    </div>
+
+    <!-- 8: PROTOCOL DIAGRAMS -->
+    <div class="slide" data-i="8">
+      <div class="tag"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" fill="none" stroke-width="2"/><polyline points="14 2 14 8 20 8" stroke="currentColor" fill="none" stroke-width="2"/></svg> Reading specs</div>
+      <h1>How to read wire diagrams</h1>
+      <div class="sub">Protocol specs use bit 0 = MSb (opposite of register convention)</div>
+
+      <div class="cols">
+        <div>
+          <h2>Protocol diagram (RFC / IEEE)</h2>
+          <pre>Bit: 0  1  2  3  4  5  6  7
+     &uarr;                    &uarr;
+    MSb                  LSb
+    (first on wire)    (last)</pre>
+          <p class="dim">Bit 0 = most significant. Transmission order: left to right.</p>
+        </div>
+        <div>
+          <h2>Register datasheet (HW convention)</h2>
+          <pre>Bit: 7  6  5  4  3  2  1  0
+     &uarr;                    &uarr;
+    MSb                  LSb
+    (highest value)    (lowest)</pre>
+          <p class="dim">Bit 0 = least significant. Value order: right to left.</p>
+        </div>
+      </div>
+
+      <h2>Same byte, two labelings</h2>
+      <pre>Value: <span class="num">0x08</span> = <span class="num">0000 1000</span>
+
+Protocol:  bit 0  1  2  3  <span style="color:var(--accent)">4</span>  5  6  7       &larr; MSb is bit 0
+                0  0  0  0  <span style="color:var(--accent)">1</span>  0  0  0
+
+Register:  bit 7  6  5  4  <span style="color:var(--accent)">3</span>  2  1  0       &larr; LSb is bit 0
+                0  0  0  0  <span style="color:var(--accent)">1</span>  0  0  0
+
+Same data. Just numbered from opposite ends.</pre>
+
+      <div class="box warn">When reading a protocol spec, bit 0 is <strong>NOT</strong> the same bit 0 as in your PCS register datasheet. Specs count from MSb; hardware counts from LSb.</div>
+    </div>
+
+    <!-- 9: HTONS BRIDGE -->
+    <div class="slide" data-i="9">
+      <div class="tag"><svg viewBox="0 0 24 24"><path d="M8 3v3a2 2 0 01-2 2H3m18 0h-3a2 2 0 01-2-2V3m0 18v-3a2 2 0 012-2h3M3 16h3a2 2 0 012 2v3" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg> The bridge</div>
+      <h1><code>htons()</code> &mdash; host to network</h1>
+      <div class="sub">The bridge between CPU byte order and wire byte order</div>
+
+      <pre><span class="ty">uint16_t</span> type = <span class="num">0x0800</span>;   <span class="cm">// in CPU register</span>
+
+<span class="cm">// Without htons — WRONG on little-endian</span>
+Memory: [<span class="num">00</span>] [<span class="num">08</span>]   &larr; wire sees 0x0008 &rarr; <span style="color:var(--err)">frame dropped!</span>
+
+<span class="cm">// With htons — CORRECT</span>
+<span class="kw">type</span> = <span class="fn">htons</span>(<span class="num">0x0800</span>);    <span class="cm">// swaps to 0x0008 in register</span>
+Memory: [<span class="num">08</span>] [<span class="num">00</span>]   &larr; wire sees 0x0800 &rarr; <span style="color:var(--ok)">IPv4 recognized</span></pre>
+
+      <h2>The full family</h2>
+      <table>
+        <thead><tr><th>Function</th><th>Direction</th><th>Size</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">htons()</td><td class="prose">Host &rarr; Network</td><td class="mono">uint16_t</td></tr>
+          <tr><td class="mono">ntohs()</td><td class="prose">Network &rarr; Host</td><td class="mono">uint16_t</td></tr>
+          <tr><td class="mono">htonl()</td><td class="prose">Host &rarr; Network</td><td class="mono">uint32_t</td></tr>
+          <tr><td class="mono">ntohl()</td><td class="prose">Network &rarr; Host</td><td class="mono">uint32_t</td></tr>
+        </tbody>
+      </table>
+
+      <div class="box ok">On a big-endian CPU these are all no-ops &mdash; the byte order already matches. On little-endian they swap. Your code calls them regardless; the compiler optimizes away the no-op case.</div>
+    </div>
+
+    <!-- 10: BITFIELD PROBLEM -->
+    <div class="slide" data-i="10">
+      <div class="tag"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg> Trap</div>
+      <h1>The <span class="err">bitfield</span> trap</h1>
+      <div class="sub">C bitfield layout is compiler-dependent &mdash; never matches the spec on all platforms</div>
+
+      <pre><span class="kw">struct</span> x {
+    <span class="ty">uint8_t</span> pt:<span class="num">4</span>, C:<span class="num">1</span>, ind:<span class="num">3</span>;     <span class="cm">// byte 0</span>
+    <span class="ty">uint8_t</span> tsi:<span class="num">2</span>, tsf:<span class="num">2</span>, cnt:<span class="num">4</span>;  <span class="cm">// byte 1</span>
+} __packed;</pre>
+
+      <div class="cols">
+        <div>
+          <h2>What the spec says</h2>
+          <div style="display:flex;gap:1px;margin-bottom:2px">
+            <div class="bit-label">7</div><div class="bit-label">6</div><div class="bit-label">5</div><div class="bit-label">4</div><div class="bit-label">3</div><div class="bit-label">2</div><div class="bit-label">1</div><div class="bit-label">0</div>
+          </div>
+          <div class="bit-row">
+            <div class="bit-cell on">p</div><div class="bit-cell on">t</div><div class="bit-cell on"> </div><div class="bit-cell on"> </div><div class="bit-cell" style="border-color:var(--warn);color:var(--warn)">C</div><div class="bit-cell" style="border-color:var(--ok);color:var(--ok)">i</div><div class="bit-cell" style="border-color:var(--ok);color:var(--ok)">n</div><div class="bit-cell" style="border-color:var(--ok);color:var(--ok)">d</div>
+          </div>
+          <div style="display:flex;gap:1px;font-size:0.62rem;color:var(--text-dim);font-family:'Fira Code',monospace">
+            <span style="width:116px;text-align:center;color:var(--accent)">pt (4)</span>
+            <span style="width:28px;text-align:center;color:var(--warn)">C</span>
+            <span style="width:87px;text-align:center;color:var(--ok)">ind (3)</span>
+          </div>
+        </div>
+        <div>
+          <h2 style="color:var(--err)">What GCC on LE actually does</h2>
+          <div style="display:flex;gap:1px;margin-bottom:2px">
+            <div class="bit-label">7</div><div class="bit-label">6</div><div class="bit-label">5</div><div class="bit-label">4</div><div class="bit-label">3</div><div class="bit-label">2</div><div class="bit-label">1</div><div class="bit-label">0</div>
+          </div>
+          <div class="bit-row">
+            <div class="bit-cell" style="border-color:var(--ok);color:var(--ok)">i</div><div class="bit-cell" style="border-color:var(--ok);color:var(--ok)">n</div><div class="bit-cell" style="border-color:var(--ok);color:var(--ok)">d</div><div class="bit-cell" style="border-color:var(--warn);color:var(--warn)">C</div><div class="bit-cell on">p</div><div class="bit-cell on">t</div><div class="bit-cell on"> </div><div class="bit-cell on"> </div>
+          </div>
+          <div style="display:flex;gap:1px;font-size:0.62rem;color:var(--text-dim);font-family:'Fira Code',monospace">
+            <span style="width:87px;text-align:center;color:var(--ok)">ind (3)</span>
+            <span style="width:28px;text-align:center;color:var(--warn)">C</span>
+            <span style="width:116px;text-align:center;color:var(--accent)">pt (4)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="box err" style="margin-top:1rem"><strong>Reversed!</strong> GCC on little-endian fills from LSb &rarr; MSb. The first field (<code>pt</code>) lands at bit 0, not bit 7. The wire receives the wrong bit pattern.</div>
+    </div>
+
+    <!-- 11: THE FIX -->
+    <div class="slide" data-i="11">
+      <div class="tag"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/><polyline points="22 4 12 14.01 9 11.01" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Fix</div>
+      <h1>The fix: shifts &amp; masks</h1>
+      <div class="sub">You control exactly where each field lands &mdash; portable, no surprises</div>
+
+      <pre><span class="cm">// pt=0xA, C=1, ind=0x5</span>
+
+buf[<span class="num">0</span>] = (pt &lt;&lt; <span class="num">4</span>) | (C &lt;&lt; <span class="num">3</span>) | ind;
+
+pt  &lt;&lt; <span class="num">4</span>:   [<span class="num">1  0  1  0</span>  0  0  0  0]
+C   &lt;&lt; <span class="num">3</span>:   [0  0  0  0  <span class="num">1</span>  0  0  0]
+ind     :   [0  0  0  0  0  <span class="num">1  0  1</span>]
+            ─────────────────────────────
+OR result:  [<span class="num">1  0  1  0  1  1  0  1</span>] = <span class="num">0xAD</span>
+
+Bit:         7  6  5  4  3  2  1  0
+            [pt       ][C][ ind    ]  &larr; <span style="color:var(--ok)">matches spec exactly</span></pre>
+
+      <h2>Accessor macros (Zephyr style)</h2>
+      <pre><span class="cm">/* Getters */</span>
+<span class="kw">#define</span> <span class="fn">GET_PT</span>(b)    ((b) &gt;&gt; <span class="num">4</span>)
+<span class="kw">#define</span> <span class="fn">GET_C</span>(b)     (((b) &gt;&gt; <span class="num">3</span>) &amp; <span class="num">0x1</span>)
+<span class="kw">#define</span> <span class="fn">GET_IND</span>(b)   ((b) &amp; <span class="num">0x7</span>)
+
+<span class="cm">/* Setter */</span>
+<span class="kw">#define</span> <span class="fn">SET_BYTE0</span>(pt, c, ind)  (((pt) &lt;&lt; <span class="num">4</span>) | ((c) &lt;&lt; <span class="num">3</span>) | (ind))</pre>
+
+      <div class="box ok">This is exactly what your <code>adi_hal_ethernet_regmap_regmap.h</code> does &mdash; <code>BM_</code> (bitmask) and <code>BP_</code> (bit position) macros with shifts. Same principle for registers and wire protocols.</div>
+    </div>
+
+    <!-- 12: WHEN TO USE WHAT -->
+    <div class="slide" data-i="12">
+      <div class="tag"><svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"/></svg> Summary</div>
+      <h1>The complete rules</h1>
+      <div class="sub">Everything from this session in one reference</div>
+
+      <h2>Byte order (endianness)</h2>
+      <table>
+        <thead><tr><th>Field type</th><th>Swap needed?</th><th>Function</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">uint8_t[]</td><td class="prose">Never</td><td class="mono">&mdash;</td></tr>
+          <tr><td class="mono">uint16_t</td><td class="prose">Yes</td><td class="mono">htons() / ntohs()</td></tr>
+          <tr><td class="mono">uint32_t</td><td class="prose">Yes</td><td class="mono">htonl() / ntohl()</td></tr>
+          <tr><td class="mono">uint64_t</td><td class="prose">Yes</td><td class="mono">htobe64() / manual</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Bit-level fields</h2>
+      <table>
+        <thead><tr><th>Context</th><th>Use bitfields?</th><th>Use shifts/masks?</th></tr></thead>
+        <tbody>
+          <tr><td class="prose">Wire protocol headers</td><td class="prose"><span class="vs-badge bad">No</span></td><td class="prose"><span class="vs-badge wire">Yes</span></td></tr>
+          <tr><td class="prose">Hardware registers</td><td class="prose"><span class="vs-badge bad">No</span></td><td class="prose"><span class="vs-badge wire">Yes</span></td></tr>
+          <tr><td class="prose">Internal firmware structs</td><td class="prose"><span class="vs-badge le">Fine</span></td><td class="prose">Optional</td></tr>
+          <tr><td class="prose">Debug / logging</td><td class="prose"><span class="vs-badge le">Fine</span></td><td class="prose">Optional</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Spec diagrams</h2>
+      <table>
+        <thead><tr><th>Convention</th><th>Bit 0 means</th><th>Used by</th></tr></thead>
+        <tbody>
+          <tr><td class="prose">Protocol diagram (RFC/IEEE)</td><td class="prose">MSb &mdash; first on wire</td><td class="prose">Wireshark, specs</td></tr>
+          <tr><td class="prose">Hardware register</td><td class="prose">LSb &mdash; least significant</td><td class="prose">Datasheets, PCS regs</td></tr>
+        </tbody>
+      </table>
+
+      <div class="box info"><strong>Three rules cover everything:</strong> (1) <code>htons()</code>/<code>htonl()</code> for multi-byte integers, (2) shifts/masks for bitfields on the wire, (3) byte arrays need nothing.</div>
+    </div>
+
+  </div>
+
+  <nav>
+    <button class="btn" id="prev" aria-label="Previous">&#8592;</button>
+    <div class="progress"><div class="progress-fill" id="bar"></div></div>
+    <span class="counter" id="ctr">1 / 13</span>
+    <button class="btn" id="next" aria-label="Next">&#8594;</button>
+  </nav>
+</div>
+
+<script>
+  const S = document.querySelectorAll('.slide'), N = S.length;
+  let c = 0;
+  function go(i) {
+    if (i < 0 || i >= N) return;
+    S[c].classList.remove('active'); c = i; S[c].classList.add('active');
+    document.getElementById('ctr').textContent = `${c+1} / ${N}`;
+    document.getElementById('bar').style.width = `${((c+1)/N)*100}%`;
+  }
+  document.getElementById('prev').addEventListener('click', () => go(c-1));
+  document.getElementById('next').addEventListener('click', () => go(c+1));
+  document.addEventListener('keydown', e => {
+    if (e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(c+1)}
+    if (e.key==='ArrowLeft'){e.preventDefault();go(c-1)}
+    if (e.key==='Home'){e.preventDefault();go(0)}
+    if (e.key==='End'){e.preventDefault();go(N-1)}
+  });
+  let tx=0;
+  document.addEventListener('touchstart', e=>{tx=e.touches[0].clientX});
+  document.addEventListener('touchend', e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50){d<0?go(c+1):go(c-1)}});
+  go(0);
+</script>
