@@ -1,0 +1,395 @@
+<title>Rust HashMap</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;1,400&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-raised: #1f2330;
+    --border: #2a2e3b;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --accent: #e8804a;
+    --accent-glow: rgba(232, 128, 74, 0.12);
+    --keyword: #c678dd;
+    --string: #98c379;
+    --type: #61afef;
+    --number: #d19a66;
+    --comment: #5c6370;
+    --fn-name: #61afef;
+    --macro-name: #e5c07b;
+    --punctuation: #abb2bf;
+    --slide-counter: #5a5e70;
+    --nav-bg: rgba(15, 17, 23, 0.92);
+    --progress: #e8804a;
+    --tag-bg: rgba(232, 128, 74, 0.1);
+    --tag-border: rgba(232, 128, 74, 0.25);
+    --tag-text: #e8804a;
+    --table-header-bg: #1a1d28;
+    --table-row-alt: rgba(30, 34, 46, 0.5);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f7f6f3;
+      --surface: #ffffff;
+      --surface-raised: #f0eeea;
+      --border: #ddd9d1;
+      --text: #1a1a1a;
+      --text-dim: #6b6560;
+      --accent: #c9633a;
+      --accent-glow: rgba(201, 99, 58, 0.08);
+      --keyword: #a626a4;
+      --string: #50a14f;
+      --type: #0184bc;
+      --number: #c18401;
+      --comment: #a0a1a7;
+      --fn-name: #0184bc;
+      --macro-name: #c18401;
+      --punctuation: #383a42;
+      --slide-counter: #a0a1a7;
+      --nav-bg: rgba(247, 246, 243, 0.94);
+      --progress: #c9633a;
+      --tag-bg: rgba(201, 99, 58, 0.08);
+      --tag-border: rgba(201, 99, 58, 0.2);
+      --tag-text: #c9633a;
+      --table-header-bg: #edeae5;
+      --table-row-alt: rgba(240, 238, 234, 0.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-raised: #1f2330;
+    --border: #2a2e3b;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --accent: #e8804a;
+    --accent-glow: rgba(232, 128, 74, 0.12);
+    --keyword: #c678dd;
+    --string: #98c379;
+    --type: #61afef;
+    --number: #d19a66;
+    --comment: #5c6370;
+    --fn-name: #61afef;
+    --macro-name: #e5c07b;
+    --punctuation: #abb2bf;
+    --slide-counter: #5a5e70;
+    --nav-bg: rgba(15, 17, 23, 0.92);
+    --progress: #e8804a;
+    --tag-bg: rgba(232, 128, 74, 0.1);
+    --tag-border: rgba(232, 128, 74, 0.25);
+    --tag-text: #e8804a;
+    --table-header-bg: #1a1d28;
+    --table-row-alt: rgba(30, 34, 46, 0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .deck { height: 100%; display: flex; flex-direction: column; }
+  .slides-viewport { flex: 1; overflow: hidden; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    padding: 3rem 3.5rem 2rem;
+    display: none; flex-direction: column;
+    opacity: 0; transition: opacity 0.3s ease;
+    overflow-y: auto;
+  }
+  .slide.active { display: flex; opacity: 1; }
+
+  .slide-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--tag-text); background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    padding: 0.2em 0.7em; border-radius: 3px;
+    margin-bottom: 1.2rem; width: fit-content;
+  }
+
+  h1 {
+    font-size: 2.4rem; font-weight: 700; line-height: 1.15;
+    text-wrap: balance; margin-bottom: 0.4rem; letter-spacing: -0.02em;
+  }
+  h1 code {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent); font-weight: 700;
+    background: none; padding: 0; font-size: 0.92em;
+  }
+
+  .subtitle {
+    font-family: 'IBM Plex Serif', Georgia, serif;
+    font-style: italic; color: var(--text-dim);
+    font-size: 1.05rem; margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-size: 1.1rem; font-weight: 600; color: var(--accent);
+    margin-bottom: 0.8rem; margin-top: 1.6rem; letter-spacing: 0.01em;
+  }
+  h2:first-of-type { margin-top: 0; }
+
+  p { max-width: 62ch; margin-bottom: 0.8rem; }
+  p.dim { color: var(--text-dim); font-size: 0.92rem; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.88em;
+    background: var(--surface); padding: 0.15em 0.4em;
+    border-radius: 3px; color: var(--type);
+  }
+
+  pre {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1.1rem 1.3rem; overflow-x: auto;
+    margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; line-height: 1.65; tab-size: 4;
+  }
+
+  .kw { color: var(--keyword); font-weight: 500; }
+  .ty { color: var(--type); }
+  .str { color: var(--string); }
+  .num { color: var(--number); }
+  .cm { color: var(--comment); font-style: italic; }
+  .fn { color: var(--fn-name); }
+  .mac { color: var(--macro-name); }
+  .pn { color: var(--punctuation); }
+  .hl { background: var(--accent-glow); padding: 0.1em 0.3em; border-radius: 3px; border: 1px solid var(--tag-border); }
+
+  table { border-collapse: collapse; width: 100%; max-width: 56rem; font-size: 0.88rem; margin-bottom: 1rem; }
+  thead { background: var(--table-header-bg); }
+  th { text-align: left; font-weight: 600; padding: 0.55rem 1rem; border-bottom: 2px solid var(--border); font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); }
+  td { padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+  td.prose { font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.88rem; }
+  tbody tr:nth-child(even) { background: var(--table-row-alt); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 0.5rem; }
+
+  .callout {
+    background: var(--accent-glow); border-left: 3px solid var(--accent);
+    padding: 0.8rem 1.1rem; border-radius: 0 4px 4px 0;
+    margin-bottom: 1rem; font-size: 0.9rem;
+  }
+  .callout code { background: transparent; }
+
+  ul { padding-left: 1.3rem; margin-bottom: 0.8rem; }
+  li { margin-bottom: 0.3rem; max-width: 62ch; }
+
+  .title-slide { justify-content: center; align-items: center; text-align: center; }
+  .title-slide h1 { font-size: 3rem; margin-bottom: 0.6rem; }
+  .title-slide .subtitle { font-size: 1.15rem; margin-bottom: 0; }
+  .title-slide .deck-meta {
+    margin-top: 2.5rem; font-size: 0.82rem;
+    color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
+  }
+
+  .rust-logo {
+    width: 56px; height: 56px; margin-bottom: 1.8rem; opacity: 0.7;
+  }
+
+  nav {
+    background: var(--nav-bg); border-top: 1px solid var(--border);
+    padding: 0.6rem 1.5rem;
+    padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .progress-track { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--progress); border-radius: 2px; transition: width 0.3s ease; }
+  .nav-counter { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--slide-counter); min-width: 3.5rem; text-align: center; font-variant-numeric: tabular-nums; }
+  .nav-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
+    width: 2.2rem; height: 2.2rem; border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s, color 0.15s; font-size: 1rem;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 700px) {
+    .slide { padding: 2rem 1.2rem 1.5rem; }
+    h1 { font-size: 1.7rem; }
+    .title-slide h1 { font-size: 2.2rem; }
+    .two-col { grid-template-columns: 1fr; gap: 1rem; }
+    pre { font-size: 0.75rem; padding: 0.8rem; }
+    table { font-size: 0.78rem; }
+  }
+</style>
+
+<div class="deck">
+  <div class="slides-viewport">
+
+    <!-- SLIDE 0: Title -->
+    <div class="slide title-slide active" data-idx="0">
+      <svg class="rust-logo" viewBox="0 0 106 106" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="53" cy="53" r="50" stroke="var(--accent)" stroke-width="3" fill="none"/>
+        <text x="53" y="62" text-anchor="middle" font-family="'IBM Plex Sans', sans-serif" font-weight="700" font-size="28" fill="var(--accent)">R</text>
+      </svg>
+      <h1>HashMap</h1>
+      <div class="subtitle">Matching ICMP requests to replies without relying on stack order</div>
+      <div class="deck-meta">7 slides &middot; from Eq/Hash to a real tracking use case</div>
+    </div>
+
+    <!-- SLIDE 1: The problem with a stack -->
+    <div class="slide" data-idx="1">
+      <div class="slide-tag">Motivation</div>
+      <h1>Why not a stack?</h1>
+      <div class="subtitle">Ping requests and replies don't arrive LIFO</div>
+
+      <pre><span class="cm">// two requests fired before any reply comes back</span>
+<span class="ty">Request</span>  ident=1, seq=0    <span class="pn">-&gt;</span> push
+<span class="ty">Request</span>  ident=1, seq=1    <span class="pn">-&gt;</span> push
+
+<span class="cm">// reply for the OLDER request arrives first</span>
+<span class="ty">Reply</span>    ident=1, seq=0    <span class="pn">-&gt;</span> pop() <span class="kw">gives</span> seq=1&#8217;s request &mdash; <span class="hl">wrong pair</span></pre>
+
+      <div class="callout"><strong>Pop gives you the most recent push, not the correct match.</strong> The right pairing key is <code>(ident, seq)</code>, not arrival order on a stack.</div>
+    </div>
+
+    <!-- SLIDE 2: What HashMap is -->
+    <div class="slide" data-idx="2">
+      <div class="slide-tag">Concept</div>
+      <h1><code>HashMap&lt;K, V&gt;</code></h1>
+      <div class="subtitle">Part of std::collections &mdash; no external crate needed</div>
+
+      <pre><span class="kw">use</span> std::collections::<span class="ty">HashMap</span>;
+
+<span class="kw">let</span> <span class="kw">mut</span> pending: <span class="ty">HashMap</span>&lt;u16, <span class="ty">PendingPing</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+pending.<span class="fn">insert</span>(ident, entry);
+pending.<span class="fn">remove</span>(&amp;ident);</pre>
+
+      <p>A key-value store: given a key, look up, insert, or remove its value in roughly constant time &mdash; no linear scan required.</p>
+
+      <div class="callout">Requirement: <code>K</code> must implement <code>Eq + Hash</code>. Built-in types like <code>u16</code>, <code>String</code>, tuples of hashable types &mdash; already satisfy this.</div>
+    </div>
+
+    <!-- SLIDE 3: Eq and Hash -->
+    <div class="slide" data-idx="3">
+      <div class="slide-tag">Concept</div>
+      <h1>Why <code>Eq</code>, not just <code>PartialEq</code></h1>
+      <div class="subtitle">A hashmap needs a key that is always equal to itself</div>
+
+      <pre><span class="kw">trait</span> <span class="ty">PartialEq</span> { <span class="kw">fn</span> <span class="fn">eq</span>(&amp;self, other: &amp;<span class="ty">Self</span>) -&gt; <span class="ty">bool</span>; }
+<span class="kw">trait</span> <span class="ty">Eq</span>: <span class="ty">PartialEq</span> {}  <span class="cm">// promise: eq is reflexive, no exceptions</span>
+
+<span class="cm">// f64::NAN breaks reflexivity &mdash; NAN == NAN is false</span>
+<span class="cm">// so f64 implements PartialEq but NOT Eq</span></pre>
+
+      <p>Lookup works by: compute <code>hash(key)</code> to find the bucket, then compare with <code>==</code> to confirm the match. If a key weren&#8217;t guaranteed equal to itself, you could insert a value and never retrieve it back.</p>
+
+      <div class="callout"><code>Eq</code> is the compiler-enforced guarantee that lookups are reliable. That's why <code>HashMap&lt;K, V&gt;</code> requires <code>K: Eq</code>, not merely <code>PartialEq</code>.</div>
+    </div>
+
+    <!-- SLIDE 4: Custom key type -->
+    <div class="slide" data-idx="4">
+      <div class="slide-tag">Syntax</div>
+      <h1>Deriving a custom key</h1>
+      <div class="subtitle">derive checks that every field is itself Eq + Hash</div>
+
+      <pre><span class="pn">#[derive(</span><span class="ty">Hash</span>, <span class="ty">Eq</span>, <span class="ty">PartialEq</span>, <span class="ty">Debug</span><span class="pn">)]</span>
+<span class="kw">struct</span> <span class="ty">PingKey</span> {
+    ident: <span class="ty">u16</span>,
+    src_ip: <span class="ty">Ipv4Addr</span>,
+}</pre>
+
+      <table>
+        <thead><tr><th>Derive</th><th>Gives you</th></tr></thead>
+        <tbody>
+          <tr><td><code>PartialEq</code></td><td class="prose">the <code>==</code> / <code>!=</code> operators</td></tr>
+          <tr><td><code>Eq</code></td><td class="prose">the reflexivity promise HashMap requires</td></tr>
+          <tr><td><code>Hash</code></td><td class="prose">a <code>.hash()</code> impl so HashMap can bucket it</td></tr>
+          <tr><td><code>Debug</code></td><td class="prose"><code>{:?}</code> formatting for logging</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">Both <code>u16</code> and <code>Ipv4Addr</code> are already <code>Eq</code>, so this derive succeeds trivially &mdash; no NaN-like landmines in either field.</div>
+    </div>
+
+    <!-- SLIDE 5: Entry API -->
+    <div class="slide" data-idx="5">
+      <div class="slide-tag">Syntax</div>
+      <h1>The Entry API</h1>
+      <div class="subtitle">Get-or-insert without writing the if/else yourself</div>
+
+      <pre><span class="cm">// insert only if the key doesn't already exist</span>
+player_stats.<span class="fn">entry</span>(<span class="str">"health"</span>).<span class="fn">or_insert</span>(<span class="num">100</span>);
+
+<span class="cm">// modify in place, or insert a default if absent</span>
+player_stats.<span class="fn">entry</span>(<span class="str">"mana"</span>)
+    .<span class="fn">and_modify</span>(|m| *m += <span class="num">200</span>)
+    .<span class="fn">or_insert</span>(<span class="num">100</span>);</pre>
+
+      <p>Applied to the ping tracker &mdash; get the queue for an <code>ident</code> if it exists, or create an empty one first:</p>
+
+      <pre>pending.<span class="fn">entry</span>(ident).<span class="fn">or_default</span>().<span class="fn">push_back</span>(entry);</pre>
+    </div>
+
+    <!-- SLIDE 6: The fix — FIFO per ident -->
+    <div class="slide" data-idx="6">
+      <div class="slide-tag">Applied</div>
+      <h1>HashMap of queues, not a stack</h1>
+      <div class="subtitle">When seq is always 0, arrival order is the only signal left</div>
+
+      <pre><span class="kw">use</span> std::collections::{<span class="ty">HashMap</span>, <span class="ty">VecDeque</span>};
+
+<span class="kw">let</span> <span class="kw">mut</span> pending: <span class="ty">HashMap</span>&lt;u16, <span class="ty">VecDeque</span>&lt;<span class="ty">PendingPing</span>&gt;&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+
+<span class="cm">// on request</span>
+pending.<span class="fn">entry</span>(ident).<span class="fn">or_default</span>().<span class="fn">push_back</span>(<span class="ty">PendingPing</span> { .. });
+
+<span class="cm">// on reply &mdash; pop the OLDEST outstanding request for this ident</span>
+<span class="kw">match</span> pending.<span class="fn">get_mut</span>(&amp;ident).<span class="fn">and_then</span>(|q| q.<span class="fn">pop_front</span>()) {
+    <span class="ty">Some</span>(req) <span class="kw">=&gt;</span> { <span class="cm">/* matched pair */</span> }
+    <span class="ty">None</span>    <span class="kw">=&gt;</span> { <span class="cm">/* orphan reply */</span> }
+}
+
+<span class="cm">// at end: anything left in any queue = unanswered requests</span></pre>
+
+      <div class="callout"><strong>Stack vs queue:</strong> pop from the <em>front</em>, not the top &mdash; replies come back in the order requests were sent. Only trust this within one <code>ident</code>, and only if the network doesn't reorder packets.</div>
+    </div>
+
+  </div>
+
+  <nav>
+    <button class="nav-btn" id="prev" aria-label="Previous slide">&#8592;</button>
+    <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+    <span class="nav-counter" id="counter">1 / 7</span>
+    <button class="nav-btn" id="next" aria-label="Next slide">&#8594;</button>
+  </nav>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const N = slides.length;
+  let c = 0;
+  function go(i) {
+    if (i < 0 || i >= N) return;
+    slides[c].classList.remove('active'); c = i; slides[c].classList.add('active');
+    document.getElementById('counter').textContent = `${c+1} / ${N}`;
+    document.getElementById('progress').style.width = `${((c+1)/N)*100}%`;
+  }
+  document.getElementById('prev').addEventListener('click', () => go(c-1));
+  document.getElementById('next').addEventListener('click', () => go(c+1));
+  document.addEventListener('keydown', e => {
+    if (e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(c+1)}
+    if (e.key==='ArrowLeft'){e.preventDefault();go(c-1)}
+    if (e.key==='Home'){e.preventDefault();go(0)}
+    if (e.key==='End'){e.preventDefault();go(N-1)}
+  });
+  let tx=0;
+  document.addEventListener('touchstart', e=>{tx=e.touches[0].clientX});
+  document.addEventListener('touchend', e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50){d<0?go(c+1):go(c-1)}});
+  go(0);
+</script>
