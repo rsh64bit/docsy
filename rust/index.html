@@ -376,7 +376,7 @@
       </svg>
       <h1>Byte Slices &amp; Packet Decoding</h1>
       <div class="subtitle">A Rust primer for Ethernet firmware engineers</div>
-      <div class="deck-meta">16 slides &middot; from &amp;[u8] to EtherType decoding</div>
+      <div class="deck-meta">17 slides &middot; from &amp;[u8] to EtherType decoding</div>
     </div>
 
     <!-- SLIDE 1: &[u8] -->
@@ -980,6 +980,73 @@ bytes[<span class="num">0</span>] = <span class="num">0xff</span>;
       </div>
 
       <div class="callout"><code>EtherType</code> is a <strong>newtype</strong> &mdash; a single-field tuple struct wrapping <code>u16</code>. This pattern gives type safety (can't accidentally pass a port number as an ethertype) while <code>.0</code> gives escape-hatch access to the raw value.</div>
+    </div>
+
+    <!-- SLIDE 16: Disabling print at runtime -->
+    <div class="slide" data-idx="16">
+      <div class="slide-tag">Practical</div>
+      <h1>Disabling <code>println!</code> on the fly</h1>
+      <div class="subtitle">Three approaches &mdash; runtime toggle, env-controlled, compile-time strip</div>
+
+      <div class="two-col">
+        <div>
+          <h2>1. <code>AtomicBool</code> toggle (true runtime)</h2>
+          <pre><span class="kw">use</span> std::sync::atomic::{<span class="ty">AtomicBool</span>, <span class="ty">Ordering</span>};
+
+<span class="kw">static</span> VERBOSE: <span class="ty">AtomicBool</span> = <span class="ty">AtomicBool</span>::new(<span class="kw">true</span>);
+
+<span class="kw">macro_rules!</span> <span class="mac">dprintln</span> {
+    ($($arg:tt)*) =&gt; {
+        <span class="kw">if</span> VERBOSE.load(<span class="ty">Ordering</span>::Relaxed) {
+            <span class="mac">println!</span>($($arg)*);
+        }
+    };
+}
+
+<span class="cm">// toggle anywhere at runtime</span>
+VERBOSE.store(<span class="kw">false</span>, <span class="ty">Ordering</span>::Relaxed);</pre>
+          <p class="dim">Lock-free, works across threads. Perfect for embedded firmware debug toggles.</p>
+
+          <h2>3. Compile-time strip</h2>
+          <pre><span class="kw">macro_rules!</span> <span class="mac">dbg_print</span> {
+    ($($arg:tt)*) =&gt; {
+        #[<span class="fn">cfg</span>(debug_assertions)]
+        <span class="mac">println!</span>($($arg)*);
+    };
+}
+<span class="cm">// gone in --release, zero overhead</span></pre>
+        </div>
+        <div>
+          <h2>2. <code>log</code> + <code>env_logger</code> (ecosystem standard)</h2>
+          <pre><span class="cm">// Cargo.toml</span>
+<span class="cm">// log = "0.4"</span>
+<span class="cm">// env_logger = "0.11"</span>
+
+<span class="kw">use</span> log::{<span class="fn">info</span>, <span class="fn">debug</span>, <span class="fn">warn</span>};
+
+<span class="kw">fn</span> <span class="fn">main</span>() {
+    env_logger::init();
+    <span class="mac">info!</span>(<span class="str">"visible at info level"</span>);
+    <span class="mac">debug!</span>(<span class="str">"only with RUST_LOG=debug"</span>);
+}</pre>
+          <pre><span class="cm"># control from shell</span>
+RUST_LOG=info  cargo run   <span class="cm"># info+warn+error</span>
+RUST_LOG=debug cargo run   <span class="cm"># everything</span>
+RUST_LOG=off   cargo run   <span class="cm"># silence all</span></pre>
+
+          <h2>Which to use?</h2>
+          <table>
+            <thead><tr><th>Approach</th><th>When</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">AtomicBool</td><td class="prose">Embedded, hard runtime toggle</td></tr>
+              <tr><td class="mono">log + env_logger</td><td class="prose">Standard apps, leveled logging</td></tr>
+              <tr><td class="mono">cfg(debug_assertions)</td><td class="prose">Strip entirely in release</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="callout"><strong>For firmware:</strong> <code>AtomicBool</code> is lock-free and zero-alloc &mdash; ideal for RISC-V. The <code>log</code> crate is the ecosystem standard for anything with a shell. <code>cfg</code> is free in release but all-or-nothing at compile time.</div>
     </div>
 
   </div>

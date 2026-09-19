@@ -1,0 +1,596 @@
+<title>Rust Pattern Matching</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;1,400&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-raised: #1f2330;
+    --border: #2a2e3b;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --accent: #e8804a;
+    --accent-glow: rgba(232, 128, 74, 0.12);
+    --keyword: #c678dd;
+    --string: #98c379;
+    --type: #61afef;
+    --number: #d19a66;
+    --comment: #5c6370;
+    --fn-name: #61afef;
+    --macro-name: #e5c07b;
+    --punctuation: #abb2bf;
+    --slide-counter: #5a5e70;
+    --nav-bg: rgba(15, 17, 23, 0.92);
+    --progress: #e8804a;
+    --tag-bg: rgba(232, 128, 74, 0.1);
+    --tag-border: rgba(232, 128, 74, 0.25);
+    --tag-text: #e8804a;
+    --table-header-bg: #1a1d28;
+    --table-row-alt: rgba(30, 34, 46, 0.5);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f7f6f3;
+      --surface: #ffffff;
+      --surface-raised: #f0eeea;
+      --border: #ddd9d1;
+      --text: #1a1a1a;
+      --text-dim: #6b6560;
+      --accent: #c9633a;
+      --accent-glow: rgba(201, 99, 58, 0.08);
+      --keyword: #a626a4;
+      --string: #50a14f;
+      --type: #0184bc;
+      --number: #c18401;
+      --comment: #a0a1a7;
+      --fn-name: #0184bc;
+      --macro-name: #c18401;
+      --punctuation: #383a42;
+      --slide-counter: #a0a1a7;
+      --nav-bg: rgba(247, 246, 243, 0.94);
+      --progress: #c9633a;
+      --tag-bg: rgba(201, 99, 58, 0.08);
+      --tag-border: rgba(201, 99, 58, 0.2);
+      --tag-text: #c9633a;
+      --table-header-bg: #edeae5;
+      --table-row-alt: rgba(240, 238, 234, 0.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-raised: #1f2330;
+    --border: #2a2e3b;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --accent: #e8804a;
+    --accent-glow: rgba(232, 128, 74, 0.12);
+    --keyword: #c678dd;
+    --string: #98c379;
+    --type: #61afef;
+    --number: #d19a66;
+    --comment: #5c6370;
+    --fn-name: #61afef;
+    --macro-name: #e5c07b;
+    --punctuation: #abb2bf;
+    --slide-counter: #5a5e70;
+    --nav-bg: rgba(15, 17, 23, 0.92);
+    --progress: #e8804a;
+    --tag-bg: rgba(232, 128, 74, 0.1);
+    --tag-border: rgba(232, 128, 74, 0.25);
+    --tag-text: #e8804a;
+    --table-header-bg: #1a1d28;
+    --table-row-alt: rgba(30, 34, 46, 0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .deck { height: 100%; display: flex; flex-direction: column; }
+  .slides-viewport { flex: 1; overflow: hidden; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    padding: 3rem 3.5rem 2rem;
+    display: none; flex-direction: column;
+    opacity: 0; transition: opacity 0.3s ease;
+    overflow-y: auto;
+  }
+  .slide.active { display: flex; opacity: 1; }
+
+  .slide-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--tag-text); background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    padding: 0.2em 0.7em; border-radius: 3px;
+    margin-bottom: 1.2rem; width: fit-content;
+  }
+
+  h1 {
+    font-size: 2.4rem; font-weight: 700; line-height: 1.15;
+    text-wrap: balance; margin-bottom: 0.4rem; letter-spacing: -0.02em;
+  }
+  h1 code {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent); font-weight: 700;
+    background: none; padding: 0; font-size: 0.92em;
+  }
+
+  .subtitle {
+    font-family: 'IBM Plex Serif', Georgia, serif;
+    font-style: italic; color: var(--text-dim);
+    font-size: 1.05rem; margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-size: 1.1rem; font-weight: 600; color: var(--accent);
+    margin-bottom: 0.8rem; margin-top: 1.6rem; letter-spacing: 0.01em;
+  }
+  h2:first-of-type { margin-top: 0; }
+
+  p { max-width: 62ch; margin-bottom: 0.8rem; }
+  p.dim { color: var(--text-dim); font-size: 0.92rem; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.88em;
+    background: var(--surface); padding: 0.15em 0.4em;
+    border-radius: 3px; color: var(--type);
+  }
+
+  pre {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1.1rem 1.3rem; overflow-x: auto;
+    margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; line-height: 1.65; tab-size: 4;
+  }
+
+  .kw { color: var(--keyword); font-weight: 500; }
+  .ty { color: var(--type); }
+  .str { color: var(--string); }
+  .num { color: var(--number); }
+  .cm { color: var(--comment); font-style: italic; }
+  .fn { color: var(--fn-name); }
+  .mac { color: var(--macro-name); }
+  .pn { color: var(--punctuation); }
+  .hl { background: var(--accent-glow); padding: 0.1em 0.3em; border-radius: 3px; border: 1px solid var(--tag-border); }
+
+  table { border-collapse: collapse; width: 100%; max-width: 56rem; font-size: 0.88rem; margin-bottom: 1rem; }
+  thead { background: var(--table-header-bg); }
+  th { text-align: left; font-weight: 600; padding: 0.55rem 1rem; border-bottom: 2px solid var(--border); font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); }
+  td { padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+  td.prose { font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.88rem; }
+  tbody tr:nth-child(even) { background: var(--table-row-alt); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 0.5rem; }
+
+  .callout {
+    background: var(--accent-glow); border-left: 3px solid var(--accent);
+    padding: 0.8rem 1.1rem; border-radius: 0 4px 4px 0;
+    margin-bottom: 1rem; font-size: 0.9rem;
+  }
+  .callout code { background: transparent; }
+
+  ul { padding-left: 1.3rem; margin-bottom: 0.8rem; }
+  li { margin-bottom: 0.3rem; max-width: 62ch; }
+
+  .title-slide { justify-content: center; align-items: center; text-align: center; }
+  .title-slide h1 { font-size: 3rem; margin-bottom: 0.6rem; }
+  .title-slide .subtitle { font-size: 1.15rem; margin-bottom: 0; }
+  .title-slide .deck-meta {
+    margin-top: 2.5rem; font-size: 0.82rem;
+    color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
+  }
+
+  .rust-logo {
+    width: 56px; height: 56px; margin-bottom: 1.8rem; opacity: 0.7;
+  }
+
+  nav {
+    background: var(--nav-bg); border-top: 1px solid var(--border);
+    padding: 0.6rem 1.5rem;
+    padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .progress-track { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--progress); border-radius: 2px; transition: width 0.3s ease; }
+  .nav-counter { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--slide-counter); min-width: 3.5rem; text-align: center; font-variant-numeric: tabular-nums; }
+  .nav-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
+    width: 2.2rem; height: 2.2rem; border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s, color 0.15s; font-size: 1rem;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 700px) {
+    .slide { padding: 2rem 1.2rem 1.5rem; }
+    h1 { font-size: 1.7rem; }
+    .title-slide h1 { font-size: 2.2rem; }
+    .two-col { grid-template-columns: 1fr; gap: 1rem; }
+    pre { font-size: 0.75rem; padding: 0.8rem; }
+    table { font-size: 0.78rem; }
+  }
+</style>
+
+<div class="deck">
+  <div class="slides-viewport">
+
+    <!-- SLIDE 0: Title -->
+    <div class="slide title-slide active" data-idx="0">
+      <svg class="rust-logo" viewBox="0 0 106 106" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="53" cy="53" r="50" stroke="var(--accent)" stroke-width="3" fill="none"/>
+        <text x="53" y="62" text-anchor="middle" font-family="'IBM Plex Sans', sans-serif" font-weight="700" font-size="28" fill="var(--accent)">R</text>
+      </svg>
+      <h1>Pattern Matching</h1>
+      <div class="subtitle">Variable declaration without let &mdash; patterns are declarations</div>
+      <div class="deck-meta">14 slides &middot; from match arms to advanced bindings</div>
+    </div>
+
+    <!-- SLIDE 1: The question -->
+    <div class="slide" data-idx="1">
+      <div class="slide-tag">Motivation</div>
+      <h1>Where is <code>epb</code> declared?</h1>
+      <div class="subtitle">The code has no let, yet a variable appears</div>
+
+      <pre><span class="kw">match</span> block.<span class="fn">unwrap</span>() {
+    <span class="ty">Block</span>::<span class="ty">EnhancedPacket</span>(<span class="hl">epb</span>) <span class="kw">=&gt;</span> {
+        <span class="cm">// epb is usable here &mdash; but where was it declared?</span>
+    }
+}</pre>
+
+      <div class="callout"><strong>Answer:</strong> <code>epb</code> is declared <em>right there</em> in the pattern. The pattern <strong>is</strong> the declaration.</div>
+    </div>
+
+    <!-- SLIDE 2: Three things at once -->
+    <div class="slide" data-idx="2">
+      <div class="slide-tag">Concept</div>
+      <h1>Three operations in one line</h1>
+      <div class="subtitle">A match arm does check + destructure + bind simultaneously</div>
+
+      <pre><span class="ty">Block</span>::<span class="ty">EnhancedPacket</span>(<span class="hl">epb</span>) <span class="kw">=&gt;</span> { ... }</pre>
+
+      <table>
+        <thead><tr><th>Step</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td class="prose">1. Check</td><td class="prose">Is the variant <code>Block::EnhancedPacket</code>?</td></tr>
+          <tr><td class="prose">2. Destructure</td><td class="prose">Extract the data inside the variant</td></tr>
+          <tr><td class="prose">3. Bind</td><td class="prose">Name that data <code>epb</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout"><strong>Rust philosophy:</strong> pattern matching is declaration. Anywhere you write a pattern, you can introduce new variables &mdash; no <code>let</code> required.</div>
+    </div>
+
+    <!-- SLIDE 3: match expressions -->
+    <div class="slide" data-idx="3">
+      <div class="slide-tag">Syntax</div>
+      <h1><code>match</code> expressions</h1>
+      <div class="subtitle">The most common place patterns appear</div>
+
+      <pre><span class="kw">match</span> some_enum {
+    <span class="ty">Variant</span>::<span class="ty">A</span>(<span class="hl">x</span>) <span class="kw">=&gt;</span> {},              <span class="cm">// x declared here</span>
+    <span class="ty">Variant</span>::<span class="ty">B</span> { field: <span class="hl">y</span> } <span class="kw">=&gt;</span> {},   <span class="cm">// y declared here</span>
+}</pre>
+
+      <p>Each arm introduces its own variables. They are scoped to that arm's body &mdash; <code>x</code> doesn't exist in the <code>B</code> arm.</p>
+
+      <h2>With guards</h2>
+      <pre><span class="kw">match</span> value {
+    <span class="hl">n</span> <span class="kw">if</span> n &gt; <span class="num">0</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"positive: {n}"</span>),
+    <span class="hl">n</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"non-positive: {n}"</span>),
+}</pre>
+    </div>
+
+    <!-- SLIDE 4: if let -->
+    <div class="slide" data-idx="4">
+      <div class="slide-tag">Syntax</div>
+      <h1><code>if let</code> expressions</h1>
+      <div class="subtitle">When you only care about one variant</div>
+
+      <pre><span class="kw">if let</span> <span class="ty">Some</span>(<span class="hl">value</span>) = optional {
+    <span class="cm">// 'value' exists only in this block</span>
+    <span class="mac">println!</span>(<span class="str">"{}"</span>, value);
+}</pre>
+
+      <p>Equivalent to a <code>match</code> with one arm + a wildcard, but more concise.</p>
+
+      <h2>Chained</h2>
+      <pre><span class="kw">if let</span> <span class="ty">Some</span>(<span class="hl">pkt</span>) = packets.<span class="fn">next</span>() {
+    <span class="kw">if let</span> <span class="ty">Ok</span>(<span class="hl">eth</span>) = <span class="ty">EthernetPacket</span>::<span class="fn">new</span>(&amp;pkt) {
+        <span class="fn">process</span>(&amp;eth);
+    }
+}</pre>
+    </div>
+
+    <!-- SLIDE 5: for loops -->
+    <div class="slide" data-idx="5">
+      <div class="slide-tag">Syntax</div>
+      <h1><code>for</code> loops</h1>
+      <div class="subtitle">The loop variable is a pattern</div>
+
+      <pre><span class="cm">// simple binding</span>
+<span class="kw">for</span> <span class="hl">item</span> <span class="kw">in</span> vec {}
+
+<span class="cm">// tuple destructure</span>
+<span class="kw">for</span> (<span class="hl">index</span>, <span class="hl">value</span>) <span class="kw">in</span> vec.<span class="fn">iter</span>().<span class="fn">enumerate</span>() {}
+
+<span class="cm">// map destructure</span>
+<span class="kw">for</span> (<span class="hl">key</span>, <span class="hl">value</span>) <span class="kw">in</span> &amp;hashmap {}</pre>
+
+      <div class="callout">Every <code>for x in iter</code> is a pattern. You've been using pattern matching since day one &mdash; <code>for item in vec</code> binds <code>item</code> via a pattern.</div>
+    </div>
+
+    <!-- SLIDE 6: function parameters -->
+    <div class="slide" data-idx="6">
+      <div class="slide-tag">Syntax</div>
+      <h1>Function parameters</h1>
+      <div class="subtitle">Parameters are patterns too</div>
+
+      <pre><span class="cm">// destructure a tuple in the signature</span>
+<span class="kw">fn</span> <span class="fn">process</span>((<span class="hl">x</span>, <span class="hl">y</span>): (<span class="ty">i32</span>, <span class="ty">i32</span>)) {
+    <span class="mac">println!</span>(<span class="str">"x={x}, y={y}"</span>);
+}
+
+<span class="cm">// destructure a struct in the signature</span>
+<span class="kw">fn</span> <span class="fn">handle</span>(<span class="ty">Point</span> { <span class="hl">x</span>, <span class="hl">y</span> }: <span class="ty">Point</span>) {
+    <span class="mac">println!</span>(<span class="str">"({x}, {y})"</span>);
+}
+
+<span class="cm">// closures too</span>
+<span class="kw">let</span> sum = |(<span class="hl">a</span>, <span class="hl">b</span>): (<span class="ty">i32</span>, <span class="ty">i32</span>)| a + b;</pre>
+    </div>
+
+    <!-- SLIDE 7: let destructuring -->
+    <div class="slide" data-idx="7">
+      <div class="slide-tag">Syntax</div>
+      <h1><code>let</code> destructuring</h1>
+      <div class="subtitle">let itself is a pattern &mdash; it's patterns all the way down</div>
+
+      <pre><span class="cm">// tuple</span>
+<span class="kw">let</span> (<span class="hl">x</span>, <span class="hl">y</span>) = (<span class="num">10</span>, <span class="num">20</span>);
+
+<span class="cm">// struct</span>
+<span class="kw">let</span> <span class="ty">Point</span> { <span class="hl">x</span>, <span class="hl">y</span> } = point;
+
+<span class="cm">// array</span>
+<span class="kw">let</span> [<span class="hl">first</span>, <span class="hl">second</span>, ..] = arr;
+
+<span class="cm">// nested</span>
+<span class="kw">let</span> (<span class="ty">Some</span>(<span class="hl">name</span>), <span class="hl">age</span>) = (get_name(), <span class="num">25</span>) <span class="kw">else</span> {
+    <span class="kw">return</span>;
+};</pre>
+
+      <div class="callout">Even <code>let x = 5;</code> is a pattern &mdash; <code>x</code> is an irrefutable pattern that binds to any value. Every <code>let</code> is pattern matching.</div>
+    </div>
+
+    <!-- SLIDE 8: while let & let else -->
+    <div class="slide" data-idx="8">
+      <div class="slide-tag">Syntax</div>
+      <h1><code>while let</code> &amp; <code>let else</code></h1>
+      <div class="subtitle">Two more pattern sites you'll use often</div>
+
+      <div class="two-col">
+        <div>
+          <h2>while let</h2>
+          <pre><span class="kw">while let</span> <span class="ty">Some</span>(<span class="hl">item</span>) = iter.<span class="fn">next</span>() {
+    <span class="fn">process</span>(item);
+}
+<span class="cm">// loop ends when pattern</span>
+<span class="cm">// stops matching (None)</span></pre>
+          <p class="dim">Common for iterators and channel receivers.</p>
+        </div>
+        <div>
+          <h2>let else (Rust 1.65+)</h2>
+          <pre><span class="kw">let</span> <span class="ty">Some</span>(<span class="hl">value</span>) = optional <span class="kw">else</span> {
+    <span class="kw">return</span> <span class="ty">Err</span>(<span class="str">"missing"</span>);
+};
+<span class="cm">// value is in scope here</span>
+<span class="cm">// the else must diverge</span></pre>
+          <p class="dim">Like an inverted <code>if let</code> &mdash; the happy path is flat.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: Advanced &mdash; @ bindings -->
+    <div class="slide" data-idx="9">
+      <div class="slide-tag">Advanced</div>
+      <h1><code>@</code> bindings</h1>
+      <div class="subtitle">Bind a variable AND test it against a pattern at once</div>
+
+      <pre><span class="kw">match</span> age {
+    <span class="hl">teen</span> @ <span class="num">13</span>..=<span class="num">19</span> <span class="kw">=&gt;</span> {
+        <span class="mac">println!</span>(<span class="str">"teenager aged {teen}"</span>);
+    }
+    <span class="hl">child</span> @ <span class="num">0</span>..=<span class="num">12</span> <span class="kw">=&gt;</span> {
+        <span class="mac">println!</span>(<span class="str">"child aged {child}"</span>);
+    }
+    <span class="hl">adult</span> <span class="kw">=&gt;</span> {
+        <span class="mac">println!</span>(<span class="str">"adult aged {adult}"</span>);
+    }
+}</pre>
+
+      <p>Without <code>@</code>, you can match a range but not name the value. With <code>@</code>, you get both.</p>
+
+      <h2>Nested @ binding</h2>
+      <pre><span class="kw">match</span> msg {
+    <span class="ty">Message</span>::<span class="ty">Move</span> { x: <span class="hl">x_val</span> @ <span class="num">0</span>..=<span class="num">100</span>, .. } <span class="kw">=&gt;</span> {
+        <span class="mac">println!</span>(<span class="str">"valid x: {x_val}"</span>);
+    }
+    _ <span class="kw">=&gt;</span> {}
+}</pre>
+    </div>
+
+    <!-- SLIDE 10: ref patterns -->
+    <div class="slide" data-idx="10">
+      <div class="slide-tag">Advanced</div>
+      <h1><code>ref</code> and <code>ref mut</code></h1>
+      <div class="subtitle">Borrow inside a pattern instead of moving</div>
+
+      <pre><span class="kw">let</span> name = <span class="ty">String</span>::<span class="fn">from</span>(<span class="str">"atlas"</span>);
+
+<span class="kw">match</span> name {
+    <span class="kw">ref</span> <span class="hl">n</span> <span class="kw">=&gt;</span> {
+        <span class="cm">// n is &String, name is NOT moved</span>
+        <span class="mac">println!</span>(<span class="str">"borrowed: {n}"</span>);
+    }
+}
+
+<span class="cm">// name is still usable here</span>
+<span class="mac">println!</span>(<span class="str">"{name}"</span>);</pre>
+
+      <div class="two-col">
+        <div>
+          <h2>Without <code>ref</code></h2>
+          <pre><span class="kw">match</span> name {
+    <span class="hl">n</span> <span class="kw">=&gt;</span> {}  <span class="cm">// n takes ownership</span>
+}
+<span class="cm">// name is MOVED, can't use</span></pre>
+        </div>
+        <div>
+          <h2>With <code>ref</code></h2>
+          <pre><span class="kw">match</span> name {
+    <span class="kw">ref</span> <span class="hl">n</span> <span class="kw">=&gt;</span> {}  <span class="cm">// n borrows</span>
+}
+<span class="cm">// name is still alive</span></pre>
+        </div>
+      </div>
+
+      <div class="callout"><code>ref mut</code> gives a mutable borrow. In modern Rust, <code>match &amp;value</code> often replaces explicit <code>ref</code>, but you'll see <code>ref</code> in older code and when matching owned values.</div>
+    </div>
+
+    <!-- SLIDE 11: All pattern sites -->
+    <div class="slide" data-idx="11">
+      <div class="slide-tag">Reference</div>
+      <h1>Where patterns appear</h1>
+      <div class="subtitle">Seven places Rust accepts a pattern</div>
+
+      <table>
+        <thead><tr><th>Site</th><th>Example</th><th>Refutable?</th></tr></thead>
+        <tbody>
+          <tr><td class="prose"><code>match</code> arm</td><td><code>Variant(x) =&gt; {}</code></td><td class="prose">Yes</td></tr>
+          <tr><td class="prose"><code>if let</code></td><td><code>if let Some(v) = opt {}</code></td><td class="prose">Yes</td></tr>
+          <tr><td class="prose"><code>while let</code></td><td><code>while let Some(v) = it.next() {}</code></td><td class="prose">Yes</td></tr>
+          <tr><td class="prose"><code>let</code></td><td><code>let (a, b) = tuple;</code></td><td class="prose">No (irrefutable)</td></tr>
+          <tr><td class="prose"><code>let else</code></td><td><code>let Some(v) = opt else { return };</code></td><td class="prose">Yes</td></tr>
+          <tr><td class="prose"><code>for</code></td><td><code>for (i, v) in iter {}</code></td><td class="prose">No (irrefutable)</td></tr>
+          <tr><td class="prose">fn / closure param</td><td><code>fn f((x, y): (i32, i32)) {}</code></td><td class="prose">No (irrefutable)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout"><strong>Refutable</strong> = might not match (e.g. <code>Some(x)</code> won't match <code>None</code>). <strong>Irrefutable</strong> = always matches. <code>let</code>, <code>for</code>, and fn params require irrefutable patterns.</div>
+    </div>
+
+    <!-- SLIDE 12: Why this design -->
+    <div class="slide" data-idx="12">
+      <div class="slide-tag">Design</div>
+      <h1>Why Rust designed it this way</h1>
+      <div class="subtitle">Patterns-as-declarations serve four goals</div>
+
+      <table>
+        <thead><tr><th>Goal</th><th>How patterns achieve it</th></tr></thead>
+        <tbody>
+          <tr><td class="prose"><strong>Conciseness</strong></td><td class="prose">Match + destructure + bind in one expression</td></tr>
+          <tr><td class="prose"><strong>Safety</strong></td><td class="prose">Variables only exist in the matched scope</td></tr>
+          <tr><td class="prose"><strong>Exhaustiveness</strong></td><td class="prose">Compiler verifies you handle all variants</td></tr>
+          <tr><td class="prose"><strong>Type inference</strong></td><td class="prose">Types are known from the pattern &mdash; no annotations needed</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Compare with C</h2>
+      <div class="two-col">
+        <div>
+          <pre><span class="cm">// C: manual, no safety</span>
+<span class="kw">if</span> (pkt->type == PKT_ICMP) {
+    <span class="ty">icmp_t</span> *icmp = pkt->data;
+    <span class="cm">// hope data is really icmp...</span>
+}</pre>
+        </div>
+        <div>
+          <pre><span class="cm">// Rust: compiler-checked</span>
+<span class="kw">match</span> pkt {
+    <span class="ty">Packet</span>::<span class="ty">Icmp</span>(<span class="hl">icmp</span>) <span class="kw">=&gt;</span> {
+        <span class="cm">// icmp is guaranteed correct</span>
+    }
+    _ <span class="kw">=&gt;</span> {}
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 13: Practice -->
+    <div class="slide" data-idx="13">
+      <div class="slide-tag">Practice</div>
+      <h1>Spot the variables</h1>
+      <div class="subtitle">How many variables does this pattern declare?</div>
+
+      <pre><span class="kw">match</span> result {
+    <span class="ty">Ok</span>((<span class="hl">code</span>, <span class="ty">Message</span>::<span class="ty">Text</span>(<span class="hl">msg</span>))) <span class="kw">=&gt;</span> {
+        <span class="mac">println!</span>(<span class="str">"code={code}, msg={msg}"</span>);
+    },
+    <span class="ty">Err</span>(<span class="hl">e</span>) <span class="kw">=&gt;</span> {
+        <span class="mac">eprintln!</span>(<span class="str">"error: {e}"</span>);
+    }
+}</pre>
+
+      <h2>Answer</h2>
+      <table>
+        <thead><tr><th>Variable</th><th>Bound from</th><th>Scope</th></tr></thead>
+        <tbody>
+          <tr><td><code>code</code></td><td class="prose">First element of the Ok tuple</td><td class="prose">Ok arm only</td></tr>
+          <tr><td><code>msg</code></td><td class="prose">Inner data of <code>Message::Text</code></td><td class="prose">Ok arm only</td></tr>
+          <tr><td><code>e</code></td><td class="prose">Error value inside <code>Err</code></td><td class="prose">Err arm only</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout"><strong>Three variables</strong>, each scoped to its own arm. Nested patterns extract from nested structures in a single expression.</div>
+    </div>
+
+  </div>
+
+  <nav>
+    <button class="nav-btn" id="prev" aria-label="Previous slide">&#8592;</button>
+    <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+    <span class="nav-counter" id="counter">1 / 14</span>
+    <button class="nav-btn" id="next" aria-label="Next slide">&#8594;</button>
+  </nav>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const N = slides.length;
+  let c = 0;
+  function go(i) {
+    if (i < 0 || i >= N) return;
+    slides[c].classList.remove('active'); c = i; slides[c].classList.add('active');
+    document.getElementById('counter').textContent = `${c+1} / ${N}`;
+    document.getElementById('progress').style.width = `${((c+1)/N)*100}%`;
+  }
+  document.getElementById('prev').addEventListener('click', () => go(c-1));
+  document.getElementById('next').addEventListener('click', () => go(c+1));
+  document.addEventListener('keydown', e => {
+    if (e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(c+1)}
+    if (e.key==='ArrowLeft'){e.preventDefault();go(c-1)}
+    if (e.key==='Home'){e.preventDefault();go(0)}
+    if (e.key==='End'){e.preventDefault();go(N-1)}
+  });
+  let tx=0;
+  document.addEventListener('touchstart', e=>{tx=e.touches[0].clientX});
+  document.addEventListener('touchend', e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50){d<0?go(c+1):go(c-1)}});
+  go(0);
+</script>
