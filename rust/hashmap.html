@@ -239,7 +239,7 @@
       </svg>
       <h1>HashMap</h1>
       <div class="subtitle">Matching ICMP requests to replies without relying on stack order</div>
-      <div class="deck-meta">7 slides &middot; from Eq/Hash to a real tracking use case</div>
+      <div class="deck-meta">10 slides &middot; from Eq/Hash to a real tracking use case</div>
     </div>
 
     <!-- SLIDE 1: The problem with a stack -->
@@ -281,6 +281,8 @@ pending.<span class="fn">remove</span>(&amp;ident);</pre>
       <h1>Why <code>Eq</code>, not just <code>PartialEq</code></h1>
       <div class="subtitle">A hashmap needs a key that is always equal to itself</div>
 
+      <p><strong>Reflexivity:</strong> for any value <code>x</code>, <code>x == x</code> must be <code>true</code> &mdash; always, no exceptions. <code>PartialEq</code> only requires <code>==</code> to be symmetric and consistent; <code>Eq</code> is a marker trait (no extra methods) that additionally promises reflexivity.</p>
+
       <pre><span class="kw">trait</span> <span class="ty">PartialEq</span> { <span class="kw">fn</span> <span class="fn">eq</span>(&amp;self, other: &amp;<span class="ty">Self</span>) -&gt; <span class="ty">bool</span>; }
 <span class="kw">trait</span> <span class="ty">Eq</span>: <span class="ty">PartialEq</span> {}  <span class="cm">// promise: eq is reflexive, no exceptions</span>
 
@@ -289,7 +291,7 @@ pending.<span class="fn">remove</span>(&amp;ident);</pre>
 
       <p>Lookup works by: compute <code>hash(key)</code> to find the bucket, then compare with <code>==</code> to confirm the match. If a key weren&#8217;t guaranteed equal to itself, you could insert a value and never retrieve it back.</p>
 
-      <div class="callout"><code>Eq</code> is the compiler-enforced guarantee that lookups are reliable. That's why <code>HashMap&lt;K, V&gt;</code> requires <code>K: Eq</code>, not merely <code>PartialEq</code>.</div>
+      <div class="callout"><code>Eq</code> is the compiler-enforced guarantee that lookups are reliable: if you inserted a value under key <code>k</code> and then immediately looked it up with that same <code>k</code>, but <code>k == k</code> could be <code>false</code>, the lookup would fail right after the insert. That's why <code>HashMap&lt;K, V&gt;</code> requires <code>K: Eq</code>, not merely <code>PartialEq</code>.</div>
     </div>
 
     <!-- SLIDE 4: Custom key type -->
@@ -360,12 +362,94 @@ pending.<span class="fn">entry</span>(ident).<span class="fn">or_default</span>(
       <div class="callout"><strong>Stack vs queue:</strong> pop from the <em>front</em>, not the top &mdash; replies come back in the order requests were sent. Only trust this within one <code>ident</code>, and only if the network doesn't reorder packets.</div>
     </div>
 
+    <!-- SLIDE 7: ident+seq collide across host pairs -->
+    <div class="slide" data-idx="7">
+      <div class="slide-tag">Motivation</div>
+      <h1>One more collision: multiple host pairs</h1>
+      <div class="subtitle"><code>(ident, seq)</code> repeats across different src/dst pairs too</div>
+
+      <pre><span class="cm">// two different hosts, same ident/seq by coincidence</span>
+<span class="ty">Request</span>  ident=1, seq=0    src=10.0.0.5  dst=10.0.0.1
+<span class="ty">Request</span>  ident=1, seq=0    src=10.0.0.9  dst=10.0.0.1
+
+<span class="cm">// reply for the SECOND host arrives first</span>
+<span class="ty">Reply</span>    ident=1, seq=0    src=10.0.0.1  dst=10.0.0.9   <span class="pn">-&gt;</span> <span class="hl">matched to the wrong host&#8217;s request</span></pre>
+
+      <div class="callout">Keying on <code>(ident, seq)</code> alone works for one host pair, but a tracker watching traffic <em>between many hosts</em> needs <code>src_ip</code> and <code>dst_ip</code> in the key too, or unrelated conversations bucket together.</div>
+    </div>
+
+    <!-- SLIDE 8: The real Key + PendingPing from pcaplyzer -->
+    <div class="slide" data-idx="8">
+      <div class="slide-tag">Applied &mdash; pcaplyzer</div>
+      <h1>The key and value, from the actual tracker</h1>
+      <div class="subtitle">A pcapng-driven ICMP tracker: <code>decode()</code> is called once per captured packet</div>
+
+      <pre><span class="pn">#[derive(</span><span class="ty">Hash</span>, <span class="ty">Eq</span>, <span class="ty">PartialEq</span>, <span class="ty">Debug</span><span class="pn">)]</span>
+<span class="kw">struct</span> <span class="ty">Key</span> {
+    ident: <span class="ty">u16</span>,
+    seq: <span class="ty">u16</span>,
+    src_ip: <span class="ty">Ipv4Addr</span>,
+    dst_ip: <span class="ty">Ipv4Addr</span>,
+}
+
+<span class="kw">struct</span> <span class="ty">PendingPing</span> {
+    rtt: <span class="ty">Duration</span>,   <span class="cm">// misleadingly named: holds the REQUEST's capture timestamp,</span>
+}                    <span class="cm">// not an RTT yet &mdash; the real RTT is computed on match</span>
+
+<span class="kw">fn</span> <span class="fn">decode</span>(
+    epb_data: &amp;[<span class="ty">u8</span>],
+    ts: <span class="ty">Duration</span>,                           <span class="cm">// pcapng capture timestamp for THIS packet</span>
+    stats: &amp;<span class="kw">mut</span> <span class="ty">IcmpStats</span>,
+    pending: &amp;<span class="kw">mut</span> <span class="ty">HashMap</span>&lt;<span class="ty">Key</span>, <span class="ty">PendingPing</span>&gt;,
+) { <span class="pn">..</span> }</pre>
+
+      <p><code>ts</code> comes from the pcapng file itself (<code>Block::EnhancedPacket(epb) =&gt; decode(&amp;epb.data, epb.timestamp, ..)</code>) &mdash; not <code>Instant::now()</code>. We're replaying a capture, so the only meaningful timestamp is when the packet was actually seen on the wire.</p>
+
+      <div class="callout">One <code>pending: HashMap&lt;Key, PendingPing&gt;</code> lives in <code>main</code> and is threaded through every <code>decode</code> call &mdash; that's what lets a request seen on packet #3 be matched against a reply seen on packet #19.</div>
+    </div>
+
+    <!-- SLIDE 9: insert on request, remove on reply, with the swap bug + fix -->
+    <div class="slide" data-idx="9">
+      <div class="slide-tag">Applied &mdash; pcaplyzer</div>
+      <h1>Insert on request, remove on reply</h1>
+      <div class="subtitle">The reply's src/dst are the request's, reversed &mdash; the key must account for that</div>
+
+      <pre><span class="kw">match</span> icmp.<span class="fn">get_icmp_type</span>() {
+    <span class="ty">IcmpTypes</span>::<span class="ty">EchoRequest</span> <span class="kw">=&gt;</span> {
+        <span class="kw">let</span> echo_req = <span class="ty">EchoRequestPacket</span>::<span class="fn">new</span>(ipv4.<span class="fn">payload</span>()).<span class="fn">unwrap</span>();
+        <span class="kw">let</span> seq = echo_req.<span class="fn">get_sequence_number</span>();
+        <span class="kw">let</span> ident = echo_req.<span class="fn">get_identifier</span>();
+        <span class="kw">let</span> req_key = <span class="ty">Key</span> { ident, seq, src_ip, dst_ip };
+        pending.<span class="fn">insert</span>(req_key, <span class="ty">PendingPing</span> { rtt: ts });
+        stats.icmp_req += <span class="num">1</span>;
+    }
+    <span class="ty">IcmpTypes</span>::<span class="ty">EchoReply</span> <span class="kw">=&gt;</span> {
+        <span class="kw">let</span> echo_reply = <span class="ty">EchoReplyPacket</span>::<span class="fn">new</span>(ipv4.<span class="fn">payload</span>()).<span class="fn">unwrap</span>();
+        <span class="kw">let</span> seq = echo_reply.<span class="fn">get_sequence_number</span>();
+        <span class="kw">let</span> ident = echo_reply.<span class="fn">get_identifier</span>();
+        <span class="kw">let</span> reply_key = <span class="ty">Key</span> {
+            ident, seq,
+            src_ip: dst_ip,   <span class="cm">// reply's dst was the request's src</span>
+            dst_ip: src_ip,   <span class="cm">// reply's src was the request's dst</span>
+        };
+        <span class="kw">if</span> <span class="kw">let</span> <span class="ty">Some</span>(req) = pending.<span class="fn">remove</span>(&amp;reply_key) {
+            <span class="kw">let</span> rtt = ts - req.rtt;
+            info!(<span class="str">"rtt {:?}"</span>, rtt);
+        }
+        stats.icmp_resp += <span class="num">1</span>;
+    }
+    <span class="pn">..</span>
+}</pre>
+
+      <div class="callout"><strong>Bug we actually hit:</strong> writing <code>Key { ident, seq, dst_ip, src_ip }</code> &mdash; fields merely reordered, no <code>field: value</code> &mdash; compiles fine but is shorthand for &#8220;assign each field from the local of the same name.&#8221; It does <em>not</em> swap anything. <code>remove</code> silently returned <code>None</code> for every one of 12 replies until the fields were written explicitly as <code>src_ip: dst_ip, dst_ip: src_ip</code>.</div>
+    </div>
+
   </div>
 
   <nav>
     <button class="nav-btn" id="prev" aria-label="Previous slide">&#8592;</button>
     <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
-    <span class="nav-counter" id="counter">1 / 7</span>
+    <span class="nav-counter" id="counter">1 / 10</span>
     <button class="nav-btn" id="next" aria-label="Next slide">&#8594;</button>
   </nav>
 </div>

@@ -239,7 +239,7 @@
       </svg>
       <h1>Pattern Matching</h1>
       <div class="subtitle">Variable declaration without let &mdash; patterns are declarations</div>
-      <div class="deck-meta">14 slides &middot; from match arms to advanced bindings</div>
+      <div class="deck-meta">17 slides &middot; from match arms to advanced bindings</div>
     </div>
 
     <!-- SLIDE 1: The question -->
@@ -561,12 +561,117 @@
       <div class="callout"><strong>Three variables</strong>, each scoped to its own arm. Nested patterns extract from nested structures in a single expression.</div>
     </div>
 
+    <!-- SLIDE 14: Matching functions that return Option -->
+    <div class="slide" data-idx="14">
+      <div class="slide-tag">Practice</div>
+      <h1>Matching a function that returns <code>Option&lt;T&gt;</code></h1>
+      <div class="subtitle">Six ways to handle the Some / None pattern</div>
+
+      <pre><span class="kw">fn</span> <span class="fn">find_user</span>(id: <span class="ty">u32</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">String</span>&gt; {
+    <span class="kw">if</span> id == <span class="num">1</span> { <span class="ty">Some</span>(<span class="str">"atlas"</span>.<span class="fn">to_string</span>()) } <span class="kw">else</span> { <span class="ty">None</span> }
+}</pre>
+
+      <div class="two-col">
+        <div>
+          <h2>match</h2>
+          <pre><span class="kw">match</span> <span class="fn">find_user</span>(<span class="num">1</span>) {
+    <span class="ty">Some</span>(<span class="hl">name</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"found {name}"</span>),
+    <span class="ty">None</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"no user"</span>),
+}</pre>
+        </div>
+        <div>
+          <h2>if let</h2>
+          <pre><span class="kw">if let</span> <span class="ty">Some</span>(<span class="hl">name</span>) = <span class="fn">find_user</span>(<span class="num">1</span>) {
+    <span class="mac">println!</span>(<span class="str">"found {name}"</span>);
+} <span class="kw">else</span> {
+    <span class="mac">println!</span>(<span class="str">"no user"</span>);
+}</pre>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <h2>let else</h2>
+          <pre><span class="kw">let</span> <span class="ty">Some</span>(<span class="hl">name</span>) = <span class="fn">find_user</span>(<span class="num">1</span>) <span class="kw">else</span> {
+    <span class="mac">println!</span>(<span class="str">"no user"</span>);
+    <span class="kw">return</span>;
+};
+<span class="cm">// name is in scope, happy path stays flat</span>
+<span class="mac">println!</span>(<span class="str">"found {name}"</span>);</pre>
+        </div>
+        <div>
+          <h2><code>?</code> operator</h2>
+          <pre><span class="kw">fn</span> <span class="fn">greet</span>(id: <span class="ty">u32</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">String</span>&gt; {
+    <span class="kw">let</span> <span class="hl">name</span> = <span class="fn">find_user</span>(id)<span class="pn">?</span>;
+    <span class="cm">// early-returns None if find_user did</span>
+    <span class="ty">Some</span>(<span class="mac">format!</span>(<span class="str">"hi {name}"</span>))
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 15: Option combinators -->
+    <div class="slide" data-idx="15">
+      <div class="slide-tag">Practice</div>
+      <h1>Chaining without unwrapping: combinators</h1>
+      <div class="subtitle"><code>map</code>, <code>and_then</code>, <code>unwrap_or</code> &mdash; no explicit match needed</div>
+
+      <pre><span class="kw">let</span> greeting: <span class="ty">Option</span>&lt;<span class="ty">String</span>&gt; = <span class="fn">find_user</span>(<span class="num">1</span>)
+    .<span class="fn">map</span>(|<span class="hl">name</span>| <span class="mac">format!</span>(<span class="str">"hello, {name}"</span>));   <span class="cm">// Some -&gt; Some, None -&gt; None</span>
+
+<span class="kw">let</span> len: <span class="ty">Option</span>&lt;<span class="ty">usize</span>&gt; = <span class="fn">find_user</span>(<span class="num">1</span>)
+    .<span class="fn">and_then</span>(|<span class="hl">name</span>| <span class="kw">if</span> name.<span class="fn">is_empty</span>() { <span class="ty">None</span> } <span class="kw">else</span> { <span class="ty">Some</span>(name.<span class="fn">len</span>()) });
+
+<span class="kw">let</span> display: <span class="ty">String</span> = <span class="fn">find_user</span>(<span class="num">99</span>)
+    .<span class="fn">unwrap_or_else</span>(|| <span class="str">"guest"</span>.<span class="fn">to_string</span>());   <span class="cm">// fallback on None</span></pre>
+
+      <table>
+        <thead><tr><th>Combinator</th><th>Some(x) does</th><th>None does</th></tr></thead>
+        <tbody>
+          <tr><td><code>map(f)</code></td><td class="prose">returns <code>Some(f(x))</code></td><td class="prose">returns <code>None</code></td></tr>
+          <tr><td><code>and_then(f)</code></td><td class="prose">returns <code>f(x)</code> (f itself returns an Option)</td><td class="prose">returns <code>None</code></td></tr>
+          <tr><td><code>unwrap_or(d)</code></td><td class="prose">returns <code>x</code></td><td class="prose">returns <code>d</code></td></tr>
+          <tr><td><code>unwrap_or_else(f)</code></td><td class="prose">returns <code>x</code></td><td class="prose">returns <code>f()</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">These are just <code>match</code> under the hood &mdash; use them when you're <em>transforming</em> the value, and switch back to explicit <code>match</code>/<code>if let</code> when the branches do meaningfully different things (like printing vs. returning).</div>
+    </div>
+
+    <!-- SLIDE 16: Option of a tuple, from this project -->
+    <div class="slide" data-idx="16">
+      <div class="slide-tag">Practice &middot; from this codebase</div>
+      <h1>Matching <code>Option&lt;(A, B, C)&gt;</code></h1>
+      <div class="subtitle">The pcap analyzer's <code>IcmpReport.resp</code> field</div>
+
+      <pre><span class="kw">struct</span> <span class="ty">IcmpReport</span> {
+    ident: <span class="ty">u16</span>,
+    seq: <span class="ty">u16</span>,
+    req_src_ip: <span class="ty">Ipv4Addr</span>,
+    req_dst_ip: <span class="ty">Ipv4Addr</span>,
+    resp: <span class="ty">Option</span>&lt;(<span class="ty">Ipv4Addr</span>, <span class="ty">Ipv4Addr</span>, <span class="ty">Duration</span>)&gt;,  <span class="cm">// None = no reply seen (NOK)</span>
+}</pre>
+
+      <p>A 3-tuple wrapped in <code>Option</code> is still just one pattern &mdash; destructure the tuple right inside the <code>Some(...)</code>:</p>
+
+      <pre><span class="kw">match</span> &amp;entry.resp {
+    <span class="ty">Some</span>((<span class="hl">resp_src</span>, <span class="hl">resp_dst</span>, <span class="hl">rtt</span>)) <span class="kw">=&gt;</span> {
+        <span class="mac">println!</span>(<span class="str">"OK  {} -&gt; {}  rtt={:?}"</span>, resp_src, resp_dst, rtt);
+    }
+    <span class="ty">None</span> <span class="kw">=&gt;</span> {
+        <span class="mac">println!</span>(<span class="str">"NOK seq={} ident={}"</span>, entry.seq, entry.ident);
+    }
+}</pre>
+
+      <div class="callout">Note: <code>Option&lt;A, B, C&gt;</code> is <strong>not valid Rust</strong> &mdash; <code>Option&lt;T&gt;</code> takes exactly one type parameter. To hold three values, wrap a tuple: <code>Option&lt;(A, B, C)&gt;</code>. The extra parentheses are what make it one type argument.</div>
+    </div>
+
   </div>
 
   <nav>
     <button class="nav-btn" id="prev" aria-label="Previous slide">&#8592;</button>
     <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
-    <span class="nav-counter" id="counter">1 / 14</span>
+    <span class="nav-counter" id="counter">1 / 17</span>
     <button class="nav-btn" id="next" aria-label="Next slide">&#8594;</button>
   </nav>
 </div>
