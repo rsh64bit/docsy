@@ -239,7 +239,7 @@
       </svg>
       <h1>Pattern Matching</h1>
       <div class="subtitle">Variable declaration without let &mdash; patterns are declarations</div>
-      <div class="deck-meta">17 slides &middot; from match arms to advanced bindings</div>
+      <div class="deck-meta">18 slides &middot; from match arms to advanced bindings</div>
     </div>
 
     <!-- SLIDE 1: The question -->
@@ -638,8 +638,58 @@
       <div class="callout">These are just <code>match</code> under the hood &mdash; use them when you're <em>transforming</em> the value, and switch back to explicit <code>match</code>/<code>if let</code> when the branches do meaningfully different things (like printing vs. returning).</div>
     </div>
 
-    <!-- SLIDE 16: Option of a tuple, from this project -->
+    <!-- SLIDE 16: map in detail -->
     <div class="slide" data-idx="16">
+      <div class="slide-tag">Deep dive</div>
+      <h1><code>Option::map</code> in detail</h1>
+      <div class="subtitle">Transform the value inside <code>Some</code>, leave <code>None</code> untouched</div>
+
+      <pre><span class="kw">let</span> greeting: <span class="ty">Option</span>&lt;<span class="ty">String</span>&gt; = <span class="fn">find_user</span>(<span class="num">1</span>)
+    .<span class="fn">map</span>(|<span class="hl">name</span>| <span class="mac">format!</span>(<span class="str">"hello, {name}"</span>));   <span class="cm">// Some -&gt; Some, None -&gt; None</span></pre>
+
+      <p><code>map</code> takes a closure <code>FnOnce(T) -&gt; U</code> and applies it <em>only if</em> the <code>Option&lt;T&gt;</code> is <code>Some</code>. The closure never runs on <code>None</code> &mdash; there's nothing to hand it. The result is always an <code>Option&lt;U&gt;</code>, so "optionality" is preserved through the transformation.</p>
+
+      <h2>What it desugars to</h2>
+      <pre><span class="kw">fn</span> <span class="fn">map</span>&lt;T, U&gt;(self, f: <span class="kw">impl</span> <span class="ty">FnOnce</span>(T) -&gt; U) -&gt; <span class="ty">Option</span>&lt;U&gt; {
+    <span class="kw">match</span> self {
+        <span class="ty">Some</span>(<span class="hl">x</span>) <span class="kw">=&gt;</span> <span class="ty">Some</span>(f(x)),   <span class="cm">// run f, rewrap in Some</span>
+        <span class="ty">None</span> <span class="kw">=&gt;</span> <span class="ty">None</span>,          <span class="cm">// skip f entirely, stay None</span>
+    }
+}</pre>
+
+      <h2>Tracing both paths</h2>
+      <table>
+        <thead><tr><th>Call</th><th>Inside map</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td class="prose"><code>find_user(1)</code> &rarr; <code>Some("atlas")</code></td><td class="prose">closure runs: <code>format!("hello, atlas")</code></td><td><code>Some("hello, atlas")</code></td></tr>
+          <tr><td class="prose"><code>find_user(99)</code> &rarr; <code>None</code></td><td class="prose">closure never called</td><td><code>None</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="two-col">
+        <div>
+          <h2>Manual equivalent</h2>
+          <pre><span class="kw">let</span> greeting = <span class="kw">match</span> <span class="fn">find_user</span>(<span class="num">1</span>) {
+    <span class="ty">Some</span>(<span class="hl">name</span>) <span class="kw">=&gt;</span> <span class="ty">Some</span>(<span class="mac">format!</span>(<span class="str">"hello, {name}"</span>)),
+    <span class="ty">None</span> <span class="kw">=&gt;</span> <span class="ty">None</span>,
+};</pre>
+          <p class="dim">Same behavior, more ceremony.</p>
+        </div>
+        <div>
+          <h2>Chaining maps</h2>
+          <pre><span class="kw">let</span> shout = <span class="fn">find_user</span>(<span class="num">1</span>)
+    .<span class="fn">map</span>(|<span class="hl">n</span>| n.<span class="fn">to_uppercase</span>())
+    .<span class="fn">map</span>(|<span class="hl">n</span>| <span class="mac">format!</span>(<span class="str">"{n}!"</span>));
+<span class="cm">// Option&lt;String&gt; -&gt; Option&lt;String&gt; -&gt; Option&lt;String&gt;</span></pre>
+          <p class="dim">Each <code>map</code> only fires if the previous one produced <code>Some</code>.</p>
+        </div>
+      </div>
+
+      <div class="callout"><strong>Reach for <code>map</code> when:</strong> you're changing the type/shape of the inner value but the <code>Some</code>/<code>None</code>-ness itself doesn't change. <strong>Reach for <code>and_then</code> instead when:</strong> your closure itself might fail or produce nothing (i.e. it returns another <code>Option</code>) &mdash; using <code>map</code> there would give you <code>Option&lt;Option&lt;U&gt;&gt;</code>, a common beginner trip-up.</div>
+    </div>
+
+    <!-- SLIDE 17: Option of a tuple, from this project -->
+    <div class="slide" data-idx="17">
       <div class="slide-tag">Practice &middot; from this codebase</div>
       <h1>Matching <code>Option&lt;(A, B, C)&gt;</code></h1>
       <div class="subtitle">The pcap analyzer's <code>IcmpReport.resp</code> field</div>
@@ -671,7 +721,7 @@
   <nav>
     <button class="nav-btn" id="prev" aria-label="Previous slide">&#8592;</button>
     <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
-    <span class="nav-counter" id="counter">1 / 17</span>
+    <span class="nav-counter" id="counter">1 / 18</span>
     <button class="nav-btn" id="next" aria-label="Next slide">&#8594;</button>
   </nav>
 </div>

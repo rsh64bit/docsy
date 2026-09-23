@@ -1,0 +1,678 @@
+<title>Rust Pattern Reference</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;1,400&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-raised: #1f2330;
+    --border: #2a2e3b;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --accent: #e8804a;
+    --accent-glow: rgba(232, 128, 74, 0.12);
+    --keyword: #c678dd;
+    --string: #98c379;
+    --type: #61afef;
+    --number: #d19a66;
+    --comment: #5c6370;
+    --fn-name: #61afef;
+    --macro-name: #e5c07b;
+    --punctuation: #abb2bf;
+    --slide-counter: #5a5e70;
+    --nav-bg: rgba(15, 17, 23, 0.92);
+    --progress: #e8804a;
+    --tag-bg: rgba(232, 128, 74, 0.1);
+    --tag-border: rgba(232, 128, 74, 0.25);
+    --tag-text: #e8804a;
+    --table-header-bg: #1a1d28;
+    --table-row-alt: rgba(30, 34, 46, 0.5);
+    --ref-bg: rgba(97, 175, 239, 0.08);
+    --ref-border: rgba(97, 175, 239, 0.3);
+    --ref-text: #61afef;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f7f6f3;
+      --surface: #ffffff;
+      --surface-raised: #f0eeea;
+      --border: #ddd9d1;
+      --text: #1a1a1a;
+      --text-dim: #6b6560;
+      --accent: #c9633a;
+      --accent-glow: rgba(201, 99, 58, 0.08);
+      --keyword: #a626a4;
+      --string: #50a14f;
+      --type: #0184bc;
+      --number: #c18401;
+      --comment: #a0a1a7;
+      --fn-name: #0184bc;
+      --macro-name: #c18401;
+      --punctuation: #383a42;
+      --slide-counter: #a0a1a7;
+      --nav-bg: rgba(247, 246, 243, 0.94);
+      --progress: #c9633a;
+      --tag-bg: rgba(201, 99, 58, 0.08);
+      --tag-border: rgba(201, 99, 58, 0.2);
+      --tag-text: #c9633a;
+      --table-header-bg: #edeae5;
+      --table-row-alt: rgba(240, 238, 234, 0.6);
+      --ref-bg: rgba(1, 132, 188, 0.06);
+      --ref-border: rgba(1, 132, 188, 0.25);
+      --ref-text: #0184bc;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-raised: #1f2330;
+    --border: #2a2e3b;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --accent: #e8804a;
+    --accent-glow: rgba(232, 128, 74, 0.12);
+    --keyword: #c678dd;
+    --string: #98c379;
+    --type: #61afef;
+    --number: #d19a66;
+    --comment: #5c6370;
+    --fn-name: #61afef;
+    --macro-name: #e5c07b;
+    --punctuation: #abb2bf;
+    --slide-counter: #5a5e70;
+    --nav-bg: rgba(15, 17, 23, 0.92);
+    --progress: #e8804a;
+    --tag-bg: rgba(232, 128, 74, 0.1);
+    --tag-border: rgba(232, 128, 74, 0.25);
+    --tag-text: #e8804a;
+    --table-header-bg: #1a1d28;
+    --table-row-alt: rgba(30, 34, 46, 0.5);
+    --ref-bg: rgba(97, 175, 239, 0.08);
+    --ref-border: rgba(97, 175, 239, 0.3);
+    --ref-text: #61afef;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .deck { height: 100%; display: flex; flex-direction: column; }
+  .slides-viewport { flex: 1; overflow: hidden; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    padding: 3rem 3.5rem 2rem;
+    display: none; flex-direction: column;
+    opacity: 0; transition: opacity 0.3s ease;
+    overflow-y: auto;
+  }
+  .slide.active { display: flex; opacity: 1; }
+
+  .slide-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--tag-text); background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    padding: 0.2em 0.7em; border-radius: 3px;
+    margin-bottom: 1.2rem; width: fit-content;
+  }
+
+  h1 {
+    font-size: 2.4rem; font-weight: 700; line-height: 1.15;
+    text-wrap: balance; margin-bottom: 0.4rem; letter-spacing: -0.02em;
+  }
+  h1 code {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent); font-weight: 700;
+    background: none; padding: 0; font-size: 0.92em;
+  }
+
+  .subtitle {
+    font-family: 'IBM Plex Serif', Georgia, serif;
+    font-style: italic; color: var(--text-dim);
+    font-size: 1.05rem; margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-size: 1.1rem; font-weight: 600; color: var(--accent);
+    margin-bottom: 0.8rem; margin-top: 1.6rem; letter-spacing: 0.01em;
+  }
+  h2:first-of-type { margin-top: 0; }
+
+  p { max-width: 62ch; margin-bottom: 0.8rem; }
+  p.dim { color: var(--text-dim); font-size: 0.92rem; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.88em;
+    background: var(--surface); padding: 0.15em 0.4em;
+    border-radius: 3px; color: var(--type);
+  }
+
+  pre {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1.1rem 1.3rem; overflow-x: auto;
+    margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; line-height: 1.65; tab-size: 4;
+  }
+
+  .kw { color: var(--keyword); font-weight: 500; }
+  .ty { color: var(--type); }
+  .str { color: var(--string); }
+  .num { color: var(--number); }
+  .cm { color: var(--comment); font-style: italic; }
+  .fn { color: var(--fn-name); }
+  .mac { color: var(--macro-name); }
+  .pn { color: var(--punctuation); }
+  .hl { background: var(--accent-glow); padding: 0.1em 0.3em; border-radius: 3px; border: 1px solid var(--tag-border); }
+
+  table { border-collapse: collapse; width: 100%; max-width: 56rem; font-size: 0.88rem; margin-bottom: 1rem; }
+  thead { background: var(--table-header-bg); }
+  th { text-align: left; font-weight: 600; padding: 0.55rem 1rem; border-bottom: 2px solid var(--border); font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); }
+  td { padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+  td.prose { font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.88rem; }
+  tbody tr:nth-child(even) { background: var(--table-row-alt); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 0.5rem; }
+
+  .callout {
+    background: var(--accent-glow); border-left: 3px solid var(--accent);
+    padding: 0.8rem 1.1rem; border-radius: 0 4px 4px 0;
+    margin-bottom: 1rem; font-size: 0.9rem;
+  }
+  .callout code { background: transparent; }
+
+  .ref-box {
+    background: var(--ref-bg); border: 1px solid var(--ref-border);
+    border-radius: 4px; padding: 0.6rem 1rem;
+    margin-bottom: 1rem; font-size: 0.82rem;
+    display: flex; align-items: baseline; gap: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .ref-box .ref-label {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    color: var(--text-dim); font-size: 0.72rem;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    flex-shrink: 0;
+  }
+  .ref-box a { color: var(--ref-text); text-decoration: none; word-break: break-all; }
+  .ref-box a:hover { text-decoration: underline; }
+
+  ul { padding-left: 1.3rem; margin-bottom: 0.8rem; }
+  li { margin-bottom: 0.3rem; max-width: 62ch; }
+
+  .title-slide { justify-content: center; align-items: center; text-align: center; }
+  .title-slide h1 { font-size: 3rem; margin-bottom: 0.6rem; }
+  .title-slide .subtitle { font-size: 1.15rem; margin-bottom: 0; }
+  .title-slide .deck-meta {
+    margin-top: 2.5rem; font-size: 0.82rem;
+    color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
+  }
+  .title-slide .ref-box { margin-top: 1.5rem; max-width: 42rem; }
+
+  .rust-logo {
+    width: 56px; height: 56px; margin-bottom: 1.8rem; opacity: 0.7;
+  }
+
+  nav {
+    background: var(--nav-bg); border-top: 1px solid var(--border);
+    padding: 0.6rem 1.5rem;
+    padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .progress-track { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--progress); border-radius: 2px; transition: width 0.3s ease; }
+  .nav-counter { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--slide-counter); min-width: 3.5rem; text-align: center; font-variant-numeric: tabular-nums; }
+  .nav-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
+    width: 2.2rem; height: 2.2rem; border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s, color 0.15s; font-size: 1rem;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 700px) {
+    .slide { padding: 2rem 1.2rem 1.5rem; }
+    h1 { font-size: 1.7rem; }
+    .title-slide h1 { font-size: 2.2rem; }
+    .two-col { grid-template-columns: 1fr; gap: 1rem; }
+    pre { font-size: 0.75rem; padding: 0.8rem; }
+    table { font-size: 0.78rem; }
+  }
+</style>
+
+<div class="deck">
+  <div class="slides-viewport">
+
+    <!-- SLIDE 0: Title -->
+    <div class="slide title-slide active" data-idx="0">
+      <svg class="rust-logo" viewBox="0 0 106 106" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="53" cy="53" r="50" stroke="var(--accent)" stroke-width="3" fill="none"/>
+        <text x="53" y="62" text-anchor="middle" font-family="'IBM Plex Sans', sans-serif" font-weight="700" font-size="28" fill="var(--accent)">R</text>
+      </svg>
+      <h1>The Complete Pattern Reference</h1>
+      <div class="subtitle">Every pattern kind Rust's grammar defines, with a worked example each</div>
+      <div class="deck-meta">15 slides &middot; one pattern kind per slide</div>
+      <div class="ref-box">
+        <span class="ref-label">Source</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html" target="_blank" rel="noopener">doc.rust-lang.org/reference/patterns.html</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 1: Literal patterns -->
+    <div class="slide" data-idx="1">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Literal patterns</h1>
+      <div class="subtitle">Match against an exact value &mdash; numbers, chars, strings, booleans</div>
+
+      <pre><span class="kw">match</span> code {
+    <span class="num">200</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"ok"</span>),
+    <span class="num">404</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"not found"</span>),
+    <span class="hl">_</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"other: {code}"</span>),
+}
+
+<span class="kw">match</span> letter {
+    <span class="str">'a'</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"first"</span>),
+    <span class="kw">true</span> <span class="kw">=&gt;</span> {} <span class="cm">// booleans are literal patterns too</span>
+}</pre>
+
+      <p>The value must implement <code>PartialEq</code> at compile time in a comparable way &mdash; integers, floats (discouraged for exact-match reasons), chars, strings, and <code>bool</code> all work as literal patterns.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.literal" target="_blank" rel="noopener">reference/patterns.html#r-patterns.literal</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: Identifier patterns -->
+    <div class="slide" data-idx="2">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Identifier patterns</h1>
+      <div class="subtitle">The plain <code>name</code> pattern &mdash; binds (or moves) the matched value</div>
+
+      <pre><span class="kw">let</span> <span class="hl">x</span> = <span class="num">5</span>;                 <span class="cm">// x is an identifier pattern</span>
+
+<span class="kw">match</span> <span class="ty">Some</span>(<span class="num">10</span>) {
+    <span class="ty">Some</span>(<span class="hl">n</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"got {n}"</span>),  <span class="cm">// n binds the inner i32</span>
+    <span class="ty">None</span> <span class="kw">=&gt;</span> {}
+}
+
+<span class="cm">// with @ to also test a subpattern (see @ bindings slide)</span>
+<span class="kw">match</span> <span class="num">7</span> {
+    <span class="hl">n</span> @ <span class="num">1</span>..=<span class="num">9</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"digit {n}"</span>),
+    _ <span class="kw">=&gt;</span> {}
+}</pre>
+
+      <p>By default this <em>moves or copies</em> the value into the new binding. Use <code>ref</code>/<code>ref mut</code> to borrow instead (see the <code>ref</code> slide), or match on a reference to get the same effect via default binding modes.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.ident" target="_blank" rel="noopener">reference/patterns.html#r-patterns.ident</a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.ident.binding" target="_blank" rel="noopener">#r-patterns.ident.binding (binding modes)</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: Wildcard pattern -->
+    <div class="slide" data-idx="3">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Wildcard pattern <code>_</code></h1>
+      <div class="subtitle">Matches anything, binds nothing &mdash; the "I don't care" pattern</div>
+
+      <pre><span class="kw">match</span> pair {
+    (<span class="num">0</span>, <span class="hl">_</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"first is zero"</span>),
+    (<span class="hl">_</span>, <span class="num">0</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"second is zero"</span>),
+    <span class="hl">_</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"neither is zero"</span>),
+}
+
+<span class="kw">let</span> <span class="hl">_</span> = expensive_call();  <span class="cm">// run for side effects, discard result</span>
+<span class="kw">let</span> (<span class="hl">a</span>, <span class="hl">_</span>, <span class="hl">c</span>) = (<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>); <span class="cm">// skip the middle element</span></pre>
+
+      <p>Unlike a named binding, <code>_</code> never triggers "unused variable" warnings and never moves the value out (important when the value has a destructor you don't want to run early &mdash; a bare <code>_x</code> also avoids the warning but still binds/drops immediately; <code>_</code> alone binds nothing at all).</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.wildcard" target="_blank" rel="noopener">reference/patterns.html#r-patterns.wildcard</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: Rest pattern -->
+    <div class="slide" data-idx="4">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Rest pattern <code>..</code></h1>
+      <div class="subtitle">"And everything else" &mdash; for structs, tuples, slices</div>
+
+      <pre><span class="kw">let</span> arr = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>];
+<span class="kw">let</span> [<span class="hl">first</span>, .., <span class="hl">last</span>] = arr;          <span class="cm">// first=1, last=5</span>
+<span class="kw">let</span> [<span class="hl">head</span>, <span class="hl">tail</span> @ ..] = arr;       <span class="cm">// head=1, tail=[2,3,4,5]</span>
+
+<span class="kw">struct</span> <span class="ty">Point3</span> { x: <span class="ty">i32</span>, y: <span class="ty">i32</span>, z: <span class="ty">i32</span> }
+<span class="kw">let</span> <span class="ty">Point3</span> { <span class="hl">x</span>, .. } = p;              <span class="cm">// only care about x</span>
+
+<span class="kw">match</span> (<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>) {
+    (<span class="hl">first</span>, .., <span class="hl">last</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"{first}..{last}"</span>),
+}</pre>
+
+      <p><code>..</code> can appear at most once per pattern (otherwise the match would be ambiguous about how many elements it consumes). Combine with <code>@</code> (<code>tail @ ..</code>) to bind the rest to a name instead of discarding it.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.rest" target="_blank" rel="noopener">reference/patterns.html#r-patterns.rest</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: Range patterns -->
+    <div class="slide" data-idx="5">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Range patterns</h1>
+      <div class="subtitle"><code>a..=b</code> inclusive ranges over chars and numbers</div>
+
+      <pre><span class="kw">match</span> grade {
+    <span class="num">90</span>..=<span class="num">100</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"A"</span>),
+    <span class="num">80</span>..<span class="num">90</span>   <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"B"</span>),   <span class="cm">// half-open, exclusive end</span>
+    <span class="hl">_</span>        <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"C or below"</span>),
+}
+
+<span class="kw">match</span> c {
+    <span class="str">'a'</span>..=<span class="str">'z'</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"lowercase"</span>),
+    <span class="str">'A'</span>..=<span class="str">'Z'</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"uppercase"</span>),
+    <span class="hl">_</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"other"</span>),
+}</pre>
+
+      <p>Only types with a defined, contiguous ordering (integers, floats, <code>char</code>) support range patterns. The old <code>...</code> inclusive syntax is deprecated in favor of <code>..=</code>.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.range" target="_blank" rel="noopener">reference/patterns.html#r-patterns.range</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: Reference patterns -->
+    <div class="slide" data-idx="6">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Reference patterns <code>&amp;</code> / <code>&amp;mut</code></h1>
+      <div class="subtitle">Match through a reference by peeling it off in the pattern</div>
+
+      <pre><span class="kw">let</span> v = <span class="mac">vec!</span>[<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>];
+
+<span class="kw">for</span> <span class="hl">item</span> <span class="kw">in</span> &amp;v {                 <span class="cm">// item: &amp;i32</span>
+    <span class="mac">println!</span>(<span class="str">"{item}"</span>);
+}
+
+<span class="kw">match</span> v.<span class="fn">first</span>() {
+    <span class="ty">Some</span>(&amp;<span class="hl">first</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"{first}"</span>),  <span class="cm">// &amp;i32 -&gt; i32 by deref pattern</span>
+    <span class="ty">None</span> <span class="kw">=&gt;</span> {}
+}
+
+<span class="kw">let</span> <span class="kw">mut</span> n = <span class="num">5</span>;
+<span class="kw">if let</span> &amp;<span class="kw">mut</span> <span class="hl">inner</span> = &amp;<span class="kw">mut</span> n { inner += <span class="num">1</span>; }</pre>
+
+      <p>Not to be confused with <code>ref</code> (which creates a reference during binding) &mdash; <code>&amp;pattern</code> instead <em>expects</em> a reference and matches what's behind it. Since Rust 2018's "match ergonomics," you often don't need this explicitly &mdash; the compiler infers it.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.ref" target="_blank" rel="noopener">reference/patterns.html#r-patterns.ref</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: Struct patterns -->
+    <div class="slide" data-idx="7">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Struct patterns</h1>
+      <div class="subtitle">Destructure named fields, in any order</div>
+
+      <pre><span class="kw">struct</span> <span class="ty">Point</span> { x: <span class="ty">i32</span>, y: <span class="ty">i32</span> }
+<span class="kw">let</span> p = <span class="ty">Point</span> { x: <span class="num">1</span>, y: <span class="num">2</span> };
+
+<span class="kw">let</span> <span class="ty">Point</span> { <span class="hl">x</span>, <span class="hl">y</span> } = p;              <span class="cm">// field-name shorthand</span>
+<span class="kw">let</span> <span class="ty">Point</span> { x: <span class="hl">a</span>, y: <span class="hl">b</span> } = p;         <span class="cm">// rename while destructuring</span>
+
+<span class="kw">match</span> p {
+    <span class="ty">Point</span> { x: <span class="num">0</span>, y } <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"on y-axis at {y}"</span>),
+    <span class="ty">Point</span> { x, .. } <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"x={x}"</span>),    <span class="cm">// .. ignores y</span>
+}</pre>
+
+      <p>Fields can be matched by literal, sub-pattern, or ignored with <code>..</code>. Field order in the pattern doesn't need to match declaration order &mdash; structs are matched by name, not position.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.struct" target="_blank" rel="noopener">reference/patterns.html#r-patterns.struct</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 8: Tuple struct patterns -->
+    <div class="slide" data-idx="8">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Tuple struct patterns</h1>
+      <div class="subtitle">Destructure by position &mdash; includes enum variants with data</div>
+
+      <pre><span class="kw">struct</span> <span class="ty">Color</span>(<span class="ty">u8</span>, <span class="ty">u8</span>, <span class="ty">u8</span>);
+<span class="kw">let</span> <span class="ty">Color</span>(<span class="hl">r</span>, <span class="hl">g</span>, <span class="hl">b</span>) = <span class="ty">Color</span>(<span class="num">255</span>, <span class="num">0</span>, <span class="num">0</span>);
+
+<span class="cm">// enum variants ARE tuple structs, pattern-wise</span>
+<span class="kw">enum</span> <span class="ty">Shape</span> { <span class="ty">Circle</span>(<span class="ty">f64</span>), <span class="ty">Rect</span>(<span class="ty">f64</span>, <span class="ty">f64</span>) }
+
+<span class="kw">match</span> shape {
+    <span class="ty">Shape</span>::<span class="ty">Circle</span>(<span class="hl">radius</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"r={radius}"</span>),
+    <span class="ty">Shape</span>::<span class="ty">Rect</span>(<span class="hl">w</span>, <span class="hl">h</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"{w}x{h}"</span>),
+}</pre>
+
+      <p>This is the pattern you've been using all session with <code>Block::EnhancedPacket(epb)</code> and <code>Some(name)</code> &mdash; any tuple-like variant or struct destructures positionally with parentheses.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.tuple-struct" target="_blank" rel="noopener">reference/patterns.html#r-patterns.tuple-struct</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: Tuple patterns -->
+    <div class="slide" data-idx="9">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Tuple patterns</h1>
+      <div class="subtitle">Destructure plain (unnamed-type) tuples</div>
+
+      <pre><span class="kw">let</span> (<span class="hl">x</span>, <span class="hl">y</span>, <span class="hl">z</span>) = (<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>);
+
+<span class="kw">let</span> pair = (<span class="ty">Some</span>(<span class="num">5</span>), <span class="num">10</span>);
+<span class="kw">match</span> pair {
+    (<span class="ty">Some</span>(<span class="hl">n</span>), <span class="hl">total</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"{n} of {total}"</span>),
+    (<span class="ty">None</span>, <span class="hl">total</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"none of {total}"</span>),
+}
+
+<span class="kw">let</span> one_tuple = (<span class="num">5</span>,);   <span class="cm">// trailing comma required for arity 1</span></pre>
+
+      <p>The empty tuple pattern <code>()</code> matches the unit type. Arity must match exactly &mdash; unlike slices, there's no partial-length tuple pattern without a <code>..</code> rest.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.tuple" target="_blank" rel="noopener">reference/patterns.html#r-patterns.tuple</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 10: Grouped (parenthesized) patterns -->
+    <div class="slide" data-idx="10">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Grouped patterns <code>( ... )</code></h1>
+      <div class="subtitle">Parentheses to disambiguate precedence &mdash; mostly with <code>|</code> and <code>..=</code></div>
+
+      <pre><span class="kw">match</span> value {
+    (<span class="num">1</span> | <span class="num">2</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"one or two"</span>),   <span class="cm">// grouping clarifies scope of |</span>
+    <span class="hl">_</span> <span class="kw">=&gt;</span> {}
+}
+
+<span class="cm">// combined with @ &mdash; group the range being tested</span>
+<span class="kw">match</span> n {
+    <span class="hl">x</span> @ (<span class="num">1</span>..=<span class="num">5</span> | <span class="num">10</span>..=<span class="num">15</span>) <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"in range: {x}"</span>),
+    <span class="hl">_</span> <span class="kw">=&gt;</span> {}
+}</pre>
+
+      <p>Rarely needed on its own since a top-level pattern is already unambiguous, but essential once you mix <code>|</code> or ranges inside a larger pattern (e.g. inside an <code>@</code> binding, as above) where precedence would otherwise be unclear.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.paren" target="_blank" rel="noopener">reference/patterns.html#r-patterns.paren</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 11: Slice patterns -->
+    <div class="slide" data-idx="11">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Slice patterns</h1>
+      <div class="subtitle">Match array/slice contents and shape at once</div>
+
+      <pre><span class="kw">match</span> slice {
+    [] <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"empty"</span>),
+    [<span class="hl">only</span>] <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"one: {only}"</span>),
+    [<span class="hl">first</span>, <span class="hl">second</span>] <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"two: {first}, {second}"</span>),
+    [<span class="hl">first</span>, .., <span class="hl">last</span>] <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"{first}..{last}"</span>),  <span class="cm">// 2+ elements</span>
+}
+
+<span class="kw">let</span> pkt: &amp;[<span class="ty">u8</span>] = &amp;[<span class="num">0x08</span>, <span class="num">0x00</span>, <span class="num">1</span>, <span class="num">2</span>];
+<span class="kw">if let</span> [<span class="num">0x08</span>, <span class="num">0x00</span>, <span class="hl">rest</span> @ ..] = pkt {
+    <span class="mac">println!</span>(<span class="str">"IPv4 ethertype, {} bytes follow"</span>, rest.<span class="fn">len</span>());
+}</pre>
+
+      <p>Unlike tuples, slices can match variable length via <code>..</code> since the length isn't part of the type for <code>&amp;[T]</code> (fixed-size arrays <code>[T; N]</code> can still require exact length when no rest pattern is used).</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.slice" target="_blank" rel="noopener">reference/patterns.html#r-patterns.slice</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 12: Path patterns / const patterns -->
+    <div class="slide" data-idx="12">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Path patterns</h1>
+      <div class="subtitle">Match a unit struct, fieldless enum variant, or associated constant by name</div>
+
+      <pre><span class="kw">enum</span> <span class="ty">Direction</span> { <span class="ty">North</span>, <span class="ty">South</span>, <span class="ty">East</span>, <span class="ty">West</span> }
+
+<span class="kw">match</span> dir {
+    <span class="ty">Direction</span>::<span class="ty">North</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"N"</span>),  <span class="cm">// fieldless variant, matched by path</span>
+    <span class="ty">Direction</span>::<span class="ty">South</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"S"</span>),
+    <span class="hl">_</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"other"</span>),
+}
+
+<span class="kw">const</span> <span class="ty">MAX</span>: <span class="ty">i32</span> = <span class="num">100</span>;
+<span class="kw">match</span> value {
+    <span class="ty">MAX</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"at the cap"</span>),   <span class="cm">// const pattern: compares by value</span>
+    <span class="hl">_</span> <span class="kw">=&gt;</span> {}
+}</pre>
+
+      <p>Careful: an <code>UPPER_CASE</code> or path-like name in a pattern is treated as a constant/path to compare against, <em>not</em> a new binding &mdash; only a plain lowercase identifier introduces a binding (identifier pattern, slide 2). This is a classic beginner trap.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.path" target="_blank" rel="noopener">reference/patterns.html#r-patterns.path</a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.const" target="_blank" rel="noopener">#r-patterns.const</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 13: Or-patterns -->
+    <div class="slide" data-idx="13">
+      <div class="slide-tag">Pattern kind</div>
+      <h1>Or-patterns <code>|</code></h1>
+      <div class="subtitle">Match any one of several alternatives in a single arm</div>
+
+      <pre><span class="kw">match</span> c {
+    <span class="str">'a'</span> | <span class="str">'e'</span> | <span class="str">'i'</span> | <span class="str">'o'</span> | <span class="str">'u'</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"vowel"</span>),
+    <span class="hl">_</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"consonant"</span>),
+}
+
+<span class="cm">// works nested inside other patterns too</span>
+<span class="kw">match</span> msg {
+    <span class="ty">Message</span>::<span class="ty">Quit</span> | <span class="ty">Message</span>::<span class="ty">Close</span> <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"stopping"</span>),
+    <span class="ty">Message</span>::<span class="ty">Move</span> { x: <span class="num">0</span> | <span class="num">100</span>, .. } <span class="kw">=&gt;</span> <span class="mac">println!</span>(<span class="str">"at an edge"</span>),
+    <span class="hl">_</span> <span class="kw">=&gt;</span> {}
+}</pre>
+
+      <p>All alternatives must bind the same set of names with the same types (you can't have <code>Ok(x) | Err(x)</code> bind <code>x</code> to different types). This is the pattern-level equivalent of stacking multiple <code>match</code> arms with identical bodies.</p>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.or" target="_blank" rel="noopener">reference/patterns.html#r-patterns.or</a>
+      </div>
+    </div>
+
+    <!-- SLIDE 14: Refutability + destructuring summary -->
+    <div class="slide" data-idx="14">
+      <div class="slide-tag">Reference summary</div>
+      <h1>Refutability &amp; where each kind is legal</h1>
+      <div class="subtitle">Not every pattern kind is allowed in every pattern <em>site</em></div>
+
+      <table>
+        <thead><tr><th>Kind</th><th>Refutable?</th><th>Typical use</th></tr></thead>
+        <tbody>
+          <tr><td class="prose">Literal</td><td class="prose">Yes</td><td class="prose"><code>match</code> arms</td></tr>
+          <tr><td class="prose">Identifier</td><td class="prose">No</td><td class="prose">everywhere &mdash; <code>let</code>, fn params, <code>for</code></td></tr>
+          <tr><td class="prose">Wildcard <code>_</code></td><td class="prose">No</td><td class="prose">everywhere</td></tr>
+          <tr><td class="prose">Rest <code>..</code></td><td class="prose">context-dependent</td><td class="prose">struct/tuple/slice patterns</td></tr>
+          <tr><td class="prose">Range</td><td class="prose">Yes</td><td class="prose"><code>match</code> arms</td></tr>
+          <tr><td class="prose">Reference <code>&amp;</code></td><td class="prose">depends on inner pattern</td><td class="prose">matching through refs</td></tr>
+          <tr><td class="prose">Struct / tuple struct / tuple</td><td class="prose">No, if exhaustive over fields</td><td class="prose"><code>let</code>, <code>match</code></td></tr>
+          <tr><td class="prose">Slice</td><td class="prose">usually Yes</td><td class="prose"><code>match</code>, <code>if let</code></td></tr>
+          <tr><td class="prose">Path / const</td><td class="prose">Yes</td><td class="prose"><code>match</code> arms</td></tr>
+          <tr><td class="prose">Or <code>|</code></td><td class="prose">Yes</td><td class="prose"><code>match</code> arms, <code>if let</code></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout"><strong>Rule of thumb:</strong> <code>let</code>, <code>for</code>, and function/closure parameters require <strong>irrefutable</strong> patterns &mdash; ones that are guaranteed to match. <code>match</code> arms, <code>if let</code>, and <code>while let</code> accept <strong>refutable</strong> patterns, since "doesn't match" is exactly what the other arm/branch handles.</div>
+
+      <div class="ref-box">
+        <span class="ref-label">Reference</span>
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.refutable" target="_blank" rel="noopener">reference/patterns.html#r-patterns.refutable</a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://doc.rust-lang.org/reference/patterns.html#r-patterns.destructure" target="_blank" rel="noopener">#r-patterns.destructure</a>
+        &nbsp;&middot;&nbsp;
+        <a href="https://doc.rust-lang.org/reference/patterns.html" target="_blank" rel="noopener">full page</a>
+      </div>
+    </div>
+
+  </div>
+
+  <nav>
+    <button class="nav-btn" id="prev" aria-label="Previous slide">&#8592;</button>
+    <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+    <span class="nav-counter" id="counter">1 / 15</span>
+    <button class="nav-btn" id="next" aria-label="Next slide">&#8594;</button>
+  </nav>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const N = slides.length;
+  let c = 0;
+  function go(i) {
+    if (i < 0 || i >= N) return;
+    slides[c].classList.remove('active'); c = i; slides[c].classList.add('active');
+    document.getElementById('counter').textContent = `${c+1} / ${N}`;
+    document.getElementById('progress').style.width = `${((c+1)/N)*100}%`;
+  }
+  document.getElementById('prev').addEventListener('click', () => go(c-1));
+  document.getElementById('next').addEventListener('click', () => go(c+1));
+  document.addEventListener('keydown', e => {
+    if (e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(c+1)}
+    if (e.key==='ArrowLeft'){e.preventDefault();go(c-1)}
+    if (e.key==='Home'){e.preventDefault();go(0)}
+    if (e.key==='End'){e.preventDefault();go(N-1)}
+  });
+  let tx=0;
+  document.addEventListener('touchstart', e=>{tx=e.touches[0].clientX});
+  document.addEventListener('touchend', e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50){d<0?go(c+1):go(c-1)}});
+  go(0);
+</script>
