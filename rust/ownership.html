@@ -1,0 +1,612 @@
+<title>Rust Ownership & Move Semantics</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;1,400&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-raised: #1f2330;
+    --border: #2a2e3b;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --accent: #e8804a;
+    --accent-glow: rgba(232, 128, 74, 0.12);
+    --keyword: #c678dd;
+    --string: #98c379;
+    --type: #61afef;
+    --number: #d19a66;
+    --comment: #5c6370;
+    --fn-name: #61afef;
+    --macro-name: #e5c07b;
+    --punctuation: #abb2bf;
+    --slide-counter: #5a5e70;
+    --nav-bg: rgba(15, 17, 23, 0.92);
+    --progress: #e8804a;
+    --tag-bg: rgba(232, 128, 74, 0.1);
+    --tag-border: rgba(232, 128, 74, 0.25);
+    --tag-text: #e8804a;
+    --table-header-bg: #1a1d28;
+    --table-row-alt: rgba(30, 34, 46, 0.5);
+    --diagram-stroke: #4a4e5c;
+    --diagram-fill: #1c2030;
+    --diagram-label: #c0c4d4;
+    --err: #f5576c;
+    --err-glow: rgba(245, 87, 108, 0.14);
+    --err-border: rgba(245, 87, 108, 0.4);
+    --ok: #4ade80;
+    --ok-glow: rgba(74, 222, 128, 0.14);
+    --ok-border: rgba(74, 222, 128, 0.4);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f7f6f3;
+      --surface: #ffffff;
+      --surface-raised: #f0eeea;
+      --border: #ddd9d1;
+      --text: #1a1a1a;
+      --text-dim: #6b6560;
+      --accent: #c9633a;
+      --accent-glow: rgba(201, 99, 58, 0.08);
+      --keyword: #a626a4;
+      --string: #50a14f;
+      --type: #0184bc;
+      --number: #c18401;
+      --comment: #a0a1a7;
+      --fn-name: #0184bc;
+      --macro-name: #c18401;
+      --punctuation: #383a42;
+      --slide-counter: #a0a1a7;
+      --nav-bg: rgba(247, 246, 243, 0.94);
+      --progress: #c9633a;
+      --tag-bg: rgba(201, 99, 58, 0.08);
+      --tag-border: rgba(201, 99, 58, 0.2);
+      --tag-text: #c9633a;
+      --table-header-bg: #edeae5;
+      --table-row-alt: rgba(240, 238, 234, 0.6);
+      --diagram-stroke: #bbb7af;
+      --diagram-fill: #f0eeea;
+      --diagram-label: #4a4540;
+      --err: #d1435a;
+      --err-glow: rgba(209, 67, 90, 0.08);
+      --err-border: rgba(209, 67, 90, 0.3);
+      --ok: #1a9850;
+      --ok-glow: rgba(26, 152, 80, 0.08);
+      --ok-border: rgba(26, 152, 80, 0.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1117;
+    --surface: #181b24;
+    --surface-raised: #1f2330;
+    --border: #2a2e3b;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --accent: #e8804a;
+    --accent-glow: rgba(232, 128, 74, 0.12);
+    --keyword: #c678dd;
+    --string: #98c379;
+    --type: #61afef;
+    --number: #d19a66;
+    --comment: #5c6370;
+    --fn-name: #61afef;
+    --macro-name: #e5c07b;
+    --punctuation: #abb2bf;
+    --slide-counter: #5a5e70;
+    --nav-bg: rgba(15, 17, 23, 0.92);
+    --progress: #e8804a;
+    --tag-bg: rgba(232, 128, 74, 0.1);
+    --tag-border: rgba(232, 128, 74, 0.25);
+    --tag-text: #e8804a;
+    --table-header-bg: #1a1d28;
+    --table-row-alt: rgba(30, 34, 46, 0.5);
+    --diagram-stroke: #4a4e5c;
+    --diagram-fill: #1c2030;
+    --diagram-label: #c0c4d4;
+    --err: #f5576c;
+    --err-glow: rgba(245, 87, 108, 0.14);
+    --err-border: rgba(245, 87, 108, 0.4);
+    --ok: #4ade80;
+    --ok-glow: rgba(74, 222, 128, 0.14);
+    --ok-border: rgba(74, 222, 128, 0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { height: 100%; }
+  body {
+    height: 100%;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .deck { height: 100%; display: flex; flex-direction: column; }
+  .slides-viewport { flex: 1; overflow: hidden; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    padding: 3rem 3.5rem 2rem;
+    display: none; flex-direction: column;
+    opacity: 0; transform: translateY(6px);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    overflow-y: auto;
+  }
+  .slide.active { display: flex; opacity: 1; transform: translateY(0); }
+
+  .slide-tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--tag-text); background: var(--tag-bg);
+    border: 1px solid var(--tag-border);
+    padding: 0.2em 0.7em; border-radius: 3px;
+    margin-bottom: 1.2rem; width: fit-content;
+    animation: tagIn 0.4s ease;
+  }
+  .slide-tag.err-tag { color: var(--err); background: var(--err-glow); border-color: var(--err-border); }
+  .slide-tag.ok-tag { color: var(--ok); background: var(--ok-glow); border-color: var(--ok-border); }
+
+  @keyframes tagIn { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+
+  h1 {
+    font-size: 2.4rem; font-weight: 700; line-height: 1.15;
+    text-wrap: balance; margin-bottom: 0.4rem; letter-spacing: -0.02em;
+    animation: riseIn 0.45s ease;
+  }
+  h1 code {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent); font-weight: 700;
+    background: none; padding: 0; font-size: 0.92em;
+  }
+  @keyframes riseIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .subtitle {
+    font-family: 'IBM Plex Serif', Georgia, serif;
+    font-style: italic; color: var(--text-dim);
+    font-size: 1.05rem; margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-size: 1.1rem; font-weight: 600; color: var(--accent);
+    margin-bottom: 0.8rem; margin-top: 1.6rem; letter-spacing: 0.01em;
+  }
+  h2:first-of-type { margin-top: 0; }
+  h2.err-h2 { color: var(--err); }
+  h2.ok-h2 { color: var(--ok); }
+
+  p { max-width: 64ch; margin-bottom: 0.8rem; }
+  p.dim { color: var(--text-dim); font-size: 0.92rem; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.88em;
+    background: var(--surface); padding: 0.15em 0.4em;
+    border-radius: 3px; color: var(--type);
+  }
+
+  pre {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 1.1rem 1.3rem; overflow-x: auto;
+    margin-bottom: 1rem; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem; line-height: 1.65; tab-size: 4;
+    position: relative;
+  }
+  pre.err-pre {
+    border-color: var(--err-border);
+    background: linear-gradient(180deg, var(--err-glow), var(--surface) 60%);
+    box-shadow: 0 0 0 1px var(--err-border), 0 8px 24px -12px var(--err-glow);
+    animation: errShake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+  }
+  pre.ok-pre {
+    border-color: var(--ok-border);
+    background: linear-gradient(180deg, var(--ok-glow), var(--surface) 60%);
+    box-shadow: 0 0 0 1px var(--ok-border), 0 8px 24px -12px var(--ok-glow);
+  }
+  @keyframes errShake {
+    10%, 90% { transform: translateX(-1px); }
+    20%, 80% { transform: translateX(2px); }
+    30%, 50%, 70% { transform: translateX(-4px); }
+    40%, 60% { transform: translateX(4px); }
+  }
+
+  .err-line {
+    display: block; margin: 0 -1.3rem; padding: 0.1em 1.3rem;
+    background: var(--err-glow); border-left: 3px solid var(--err);
+    position: relative;
+  }
+  .err-line::after {
+    content: '✕ moved value used here';
+    position: absolute; right: 1.3rem; top: 50%; transform: translateY(-50%);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+    color: var(--err); background: var(--bg); border: 1px solid var(--err-border);
+    padding: 0.1em 0.5em; border-radius: 3px; opacity: 0;
+    animation: popTag 0.4s ease 0.35s forwards;
+  }
+  @keyframes popTag { from { opacity: 0; transform: translateY(-50%) scale(0.85); } to { opacity: 1; transform: translateY(-50%) scale(1); } }
+
+  .ok-line {
+    display: block; margin: 0 -1.3rem; padding: 0.1em 1.3rem;
+    background: var(--ok-glow); border-left: 3px solid var(--ok);
+  }
+
+  .kw { color: var(--keyword); font-weight: 500; }
+  .ty { color: var(--type); }
+  .str { color: var(--string); }
+  .num { color: var(--number); }
+  .cm { color: var(--comment); font-style: italic; }
+  .fn { color: var(--fn-name); }
+  .mac { color: var(--macro-name); }
+  .pn { color: var(--punctuation); }
+  .hl { background: var(--accent-glow); padding: 0.1em 0.3em; border-radius: 3px; border: 1px solid var(--tag-border); }
+  .moved { color: var(--err); text-decoration: line-through; text-decoration-color: var(--err); opacity: 0.75; }
+
+  table { border-collapse: collapse; width: 100%; max-width: 58rem; font-size: 0.88rem; margin-bottom: 1rem; }
+  thead { background: var(--table-header-bg); }
+  th { text-align: left; font-weight: 600; padding: 0.55rem 1rem; border-bottom: 2px solid var(--border); font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); }
+  td { padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
+  td.prose { font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 0.88rem; }
+  tbody tr:nth-child(even) { background: var(--table-row-alt); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 0.5rem; }
+
+  .callout {
+    background: var(--accent-glow); border-left: 3px solid var(--accent);
+    padding: 0.8rem 1.1rem; border-radius: 0 4px 4px 0;
+    margin-bottom: 1rem; font-size: 0.9rem;
+  }
+  .callout code { background: transparent; }
+  .callout.err { background: var(--err-glow); border-left-color: var(--err); }
+  .callout.ok { background: var(--ok-glow); border-left-color: var(--ok); }
+
+  .compiler-box {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+    background: #1a0f10; border: 1px solid var(--err-border);
+    border-radius: 6px; padding: 1rem 1.2rem; margin-bottom: 1rem;
+    color: #ffb3bd; white-space: pre-wrap; line-height: 1.6;
+    box-shadow: inset 0 0 40px rgba(245, 87, 108, 0.06);
+    animation: errIn 0.4s ease;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) .compiler-box { background: #fdf0f1; color: #a3273f; }
+  }
+  :root[data-theme="dark"] .compiler-box { background: #1a0f10; color: #ffb3bd; }
+  .compiler-box .e-code { color: var(--err); font-weight: 700; }
+  .compiler-box .e-arrow { color: #6b6f80; }
+  @keyframes errIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
+
+  .badge-row { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .pill {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+    padding: 0.25em 0.7em; border-radius: 999px; border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .pill.err { border-color: var(--err-border); color: var(--err); background: var(--err-glow); }
+  .pill.ok { border-color: var(--ok-border); color: var(--ok); background: var(--ok-glow); }
+
+  .flow {
+    display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0; flex-wrap: wrap;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+  }
+  .flow-step {
+    padding: 0.5rem 0.9rem; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--surface); white-space: nowrap;
+  }
+  .flow-step.dead { border-color: var(--err-border); background: var(--err-glow); color: var(--err); text-decoration: line-through; }
+  .flow-step.alive { border-color: var(--ok-border); background: var(--ok-glow); color: var(--ok); }
+  .flow-arrow { color: var(--text-dim); }
+
+  ul { padding-left: 1.3rem; margin-bottom: 0.8rem; }
+  li { margin-bottom: 0.3rem; max-width: 64ch; }
+
+  .title-slide { justify-content: center; align-items: center; text-align: center; }
+  .title-slide h1 { font-size: 3rem; margin-bottom: 0.6rem; }
+  .title-slide .subtitle { font-size: 1.15rem; margin-bottom: 0; }
+  .title-slide .deck-meta {
+    margin-top: 2.5rem; font-size: 0.82rem;
+    color: var(--text-dim); font-family: 'JetBrains Mono', monospace;
+  }
+
+  .rust-logo {
+    width: 72px; height: 72px; margin-bottom: 1.8rem; opacity: 0.85;
+    animation: spinIn 0.8s ease;
+    filter: drop-shadow(0 0 10px var(--accent-glow)) drop-shadow(0 0 22px var(--accent-glow));
+  }
+  @keyframes spinIn { from { opacity: 0; transform: rotate(-90deg) scale(0.6); } to { opacity: 0.85; transform: rotate(0) scale(1); } }
+
+  nav {
+    background: var(--nav-bg); border-top: 1px solid var(--border);
+    padding: 0.6rem 1.5rem;
+    padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px));
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .progress-track { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--progress); border-radius: 2px; transition: width 0.3s ease; }
+  .nav-counter { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--slide-counter); min-width: 3.5rem; text-align: center; font-variant-numeric: tabular-nums; }
+  .nav-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-dim);
+    width: 2.2rem; height: 2.2rem; border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s, color 0.15s; font-size: 1rem;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 700px) {
+    .slide { padding: 2rem 1.2rem 1.5rem; }
+    h1 { font-size: 1.7rem; }
+    .title-slide h1 { font-size: 2.2rem; }
+    .two-col { grid-template-columns: 1fr; gap: 1rem; }
+    pre { font-size: 0.75rem; padding: 0.8rem; }
+    table { font-size: 0.78rem; }
+  }
+</style>
+
+<div class="deck">
+  <div class="slides-viewport">
+
+    <!-- SLIDE 0: Title -->
+    <div class="slide title-slide active" data-idx="0">
+      <svg class="rust-logo" viewBox="0 0 144 144" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="gearHaze" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2.2"/>
+          </filter>
+          <g id="rustMark" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round" stroke-width="3">
+            <path d="m71.05 23.68c-26.06 0-47.27 21.22-47.27 47.27s21.22 47.27 47.27 47.27 47.27-21.22 47.27-47.27-21.22-47.27-47.27-47.27zm-.07 4.2a3.1 3.11 0 0 1 3.02 3.11 3.11 3.11 0 0 1 -6.22 0 3.11 3.11 0 0 1 3.2-3.11zm7.12 5.12a38.27 38.27 0 0 1 26.2 18.66l-3.67 8.28c-.63 1.43.02 3.11 1.44 3.75l7.06 3.13a38.27 38.27 0 0 1 .08 6.64h-3.93c-.39 0-.55.26-.55.64v1.8c0 4.24-2.39 5.17-4.49 5.4-2 .23-4.21-.84-4.49-2.06-1.18-6.63-3.14-8.04-6.24-10.49 3.85-2.44 7.85-6.05 7.85-10.87 0-5.21-3.57-8.49-6-10.1-3.42-2.25-7.2-2.7-8.22-2.7h-40.6a38.27 38.27 0 0 1 21.41-12.08l4.79 5.02c1.08 1.13 2.87 1.18 4 .09zm-44.2 23.02a3.11 3.11 0 0 1 3.02 3.11 3.11 3.11 0 0 1 -6.22 0 3.11 3.11 0 0 1 3.2-3.11zm74.15.14a3.11 3.11 0 0 1 3.02 3.11 3.11 3.11 0 0 1 -6.22 0 3.11 3.11 0 0 1 3.2-3.11zm-68.29.5h5.42v24.44h-10.94a38.27 38.27 0 0 1 -1.24-14.61l6.7-2.98c1.43-.64 2.08-2.31 1.44-3.74zm22.62.26h12.91c.67 0 4.71.77 4.71 3.8 0 2.51-3.1 3.41-5.65 3.41h-11.98zm0 17.56h9.89c.9 0 4.83.26 6.08 5.28.39 1.54 1.26 6.56 1.85 8.17.59 1.8 2.98 5.4 5.53 5.4h16.14a38.27 38.27 0 0 1 -3.54 4.1l-6.57-1.41c-1.53-.33-3.04.65-3.37 2.18l-1.56 7.28a38.27 38.27 0 0 1 -31.91-.15l-1.56-7.28c-.33-1.53-1.83-2.51-3.36-2.18l-6.43 1.38a38.27 38.27 0 0 1 -3.32-3.92h31.27c.35 0 .59-.06.59-.39v-11.06c0-.32-.24-.39-.59-.39h-9.15zm-14.43 25.33a3.11 3.11 0 0 1 3.02 3.11 3.11 3.11 0 0 1 -6.22 0 3.11 3.11 0 0 1 3.2-3.11zm46.05.14a3.11 3.11 0 0 1 3.02 3.11 3.11 3.11 0 0 1 -6.22 0 3.11 3.11 0 0 1 3.2-3.11z"/>
+            <path d="m115.68 70.95a44.63 44.63 0 0 1 -44.63 44.63 44.63 44.63 0 0 1 -44.63-44.63 44.63 44.63 0 0 1 44.63-44.63 44.63 44.63 0 0 1 44.63 44.63zm-.84-4.31 6.96 4.31-6.96 4.31 5.98 5.59-7.66 2.87 4.78 6.65-8.09 1.32 3.4 7.46-8.19-.29 1.88 7.98-7.98-1.88.29 8.19-7.46-3.4-1.32 8.09-6.65-4.78-2.87 7.66-5.59-5.98-4.31 6.96-4.31-6.96-5.59 5.98-2.87-7.66-6.65 4.78-1.32-8.09-7.46 3.4.29-8.19-7.98 1.88 1.88-7.98-8.19.29 3.4-7.46-8.09-1.32 4.78-6.65-7.66-2.87 5.98-5.59-6.96-4.31 6.96-4.31-5.98-5.59 7.66-2.87-4.78-6.65 8.09-1.32-3.4-7.46 8.19.29-1.88-7.98 7.98 1.88-.29-8.19 7.46 3.4 1.32-8.09 6.65 4.78 2.87-7.66 5.59 5.98 4.31-6.96 4.31 6.96 5.59-5.98 2.87 7.66 6.65-4.78 1.32 8.09 7.46-3.4-.29 8.19 7.98-1.88-1.88 7.98 8.19-.29-3.4 7.46 8.09 1.32-4.78 6.65 7.66 2.87z"/>
+          </g>
+        </defs>
+        <use href="#rustMark" fill="var(--accent)" stroke="var(--accent)" opacity="0.6" filter="url(#gearHaze)"/>
+        <use href="#rustMark" fill="var(--accent)" stroke="var(--accent)"/>
+      </svg>
+      <h1>Ownership &amp; Move Semantics</h1>
+      <div class="subtitle">Why passing a value can quietly kill it &mdash; and how to spot it before the compiler does</div>
+      <div class="deck-meta">10 slides &middot; Copy vs move &middot; scalars vs structs &middot; fixing E0382</div>
+    </div>
+
+    <!-- SLIDE 1: The question that started this -->
+    <div class="slide" data-idx="1">
+      <div class="slide-tag">Motivation</div>
+      <h1>Pass <code>x</code> to a function, then reassign it &mdash; error?</h1>
+      <div class="subtitle">The instinct says yes. Rust says: depends on the type.</div>
+
+      <pre><span class="kw">fn</span> <span class="fn">test</span>(x: <span class="ty">u32</span>) { <span class="mac">println!</span>(<span class="str">"{}"</span>, x); }
+
+<span class="kw">fn</span> <span class="fn">main</span>() {
+    <span class="kw">let mut</span> x: <span class="ty">u32</span> = <span class="num">10</span>;
+    <span class="fn">test</span>(x);   <span class="cm">// passed by value</span>
+    x = <span class="num">14</span>;  <span class="cm">// reassigned after</span>
+    <span class="fn">test</span>(x);   <span class="cm">// used again</span>
+}</pre>
+
+      <div class="callout"><strong>This compiles fine.</strong> No move error here at all &mdash; because <code>u32</code> is a scalar type. The real question is: what happens with a type that <em>isn't</em> a scalar?</div>
+    </div>
+
+    <!-- SLIDE 2: Copy vs Move -->
+    <div class="slide" data-idx="2">
+      <div class="slide-tag">Concept</div>
+      <h1>Two ways a value can be passed</h1>
+      <div class="subtitle">The <code>Copy</code> trait decides which one happens</div>
+
+      <table>
+        <thead><tr><th>Type kind</th><th>What happens on <code>fn(x)</code></th><th>Original <code>x</code> after?</th></tr></thead>
+        <tbody>
+          <tr><td class="prose">Implements <code>Copy</code> (<code>u32</code>, <code>bool</code>, <code>char</code>, ...)</td><td class="prose">Bits are duplicated</td><td class="prose"><span class="pill ok">still valid</span></td></tr>
+          <tr><td class="prose">Does <strong>not</strong> implement <code>Copy</code> (<code>String</code>, <code>Vec</code>, most structs)</td><td class="prose">Ownership moves into the function</td><td class="prose"><span class="pill err">invalidated</span></td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">Ownership rules apply to <strong>every</strong> value. Scalars don't dodge the rule &mdash; they just never notice it, because <code>Copy</code> means the compiler duplicates instead of invalidating.</div>
+
+      <h2>The part people miss</h2>
+      <p>Reassignment is <em>always</em> legal, move or not &mdash; it doesn't need the old value to be alive, it just overwrites the binding. The error only appears if you <strong>read</strong> the old value after a move and before reassigning.</p>
+    </div>
+
+    <!-- SLIDE 3: String move — the setup -->
+    <div class="slide" data-idx="3">
+      <div class="slide-tag err-tag">Error case &middot; 1</div>
+      <h1>Moving a <code>String</code>, then reading it</h1>
+      <div class="subtitle"><code>String</code> is not <code>Copy</code> &mdash; it owns a heap allocation</div>
+
+      <pre class="err-pre"><span class="kw">fn</span> <span class="fn">test</span>(x: <span class="ty">String</span>) { <span class="mac">println!</span>(<span class="str">"{}"</span>, x); }
+
+<span class="kw">fn</span> <span class="fn">main</span>() {
+    <span class="kw">let mut</span> x: <span class="ty">String</span> = <span class="ty">String</span>::<span class="fn">from</span>(<span class="str">"hello"</span>);
+    <span class="fn">test</span>(x);                    <span class="cm">// x moved into test</span>
+<span class="err-line">    <span class="mac">println!</span>(<span class="str">"{}"</span>, x);   <span class="cm">// x used after move</span></span>
+    x = <span class="ty">String</span>::<span class="fn">from</span>(<span class="str">"world"</span>);
+    <span class="fn">test</span>(x);
+}</pre>
+
+      <div class="flow">
+        <span class="flow-step alive">x = "hello"</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-step">test(x) moves it</span>
+        <span class="flow-arrow">&rarr;</span>
+        <span class="flow-step dead">x read here</span>
+      </div>
+
+      <div class="callout err"><strong>Why:</strong> <code>test(x)</code> takes ownership. Once inside the function, <code>main</code>'s <code>x</code> is gone. The very next line tries to read it &mdash; compiler refuses.</div>
+    </div>
+
+    <!-- SLIDE 4: the actual compiler error -->
+    <div class="slide" data-idx="4">
+      <div class="slide-tag err-tag">Error case &middot; 1 (continued)</div>
+      <h1>What <code>cargo build</code> actually prints</h1>
+      <div class="subtitle">E0382 &mdash; borrow of moved value</div>
+
+      <div class="compiler-box"><span class="e-code">error[E0382]</span>: borrow of moved value: `x`
+ <span class="e-arrow">--&gt;</span> src/main.rs:8:20
+  |
+6 |     let mut x: String = String::from("hello");
+  |         ----- move occurs because `x` has type `String`, which does not implement the `Copy` trait
+7 |     test(x);
+  |          - value moved here
+8 |     println!("{}", x);
+  |                    ^ value borrowed here after move
+  |
+help: consider cloning the value if the performance cost is acceptable
+  |
+7 |     test(x.clone());
+  |           ++++++++</div>
+
+      <div class="callout">The compiler names the exact cause (<code>String</code> isn't <code>Copy</code>), the exact move point (line 7), and the exact bad read (line 8) &mdash; and even suggests a fix.</div>
+    </div>
+
+    <!-- SLIDE 5: struct — no error yet -->
+    <div class="slide" data-idx="5">
+      <div class="slide-tag">Concept &middot; before the error</div>
+      <h1>A struct made of scalars is still <em>not</em> scalar</h1>
+      <div class="subtitle">Composite types don't inherit <code>Copy</code> from their fields</div>
+
+      <pre><span class="kw">struct</span> <span class="ty">Strct</span> { x: <span class="ty">u32</span>, y: <span class="ty">u32</span>, z: <span class="ty">u32</span> }  <span class="cm">// all fields Copy...</span>
+                                            <span class="cm">// ...but Strct itself is NOT Copy</span>
+
+<span class="kw">fn</span> <span class="fn">ownership_strcut</span>(s: <span class="ty">Strct</span>) {
+    <span class="kw">let mut</span> y: <span class="ty">Strct</span> = <span class="ty">Strct</span> { x: <span class="num">0</span>, y: <span class="num">0</span>, z: <span class="num">0</span> };
+    y = s;   <span class="cm">// moves s into y &mdash; fine, nothing read after</span>
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>() {
+    <span class="kw">let</span> s = <span class="ty">Strct</span> { x: <span class="num">0</span>, y: <span class="num">1</span>, z: <span class="num">2</span> };
+    <span class="fn">ownership_strcut</span>(s);   <span class="cm">// s moved into the function</span>
+    <span class="cm">// s never touched again &mdash; compiles clean</span>
+}</pre>
+
+      <div class="badge-row"><span class="pill">Copy must be derived explicitly</span><span class="pill">stack-only &ne; Copy</span></div>
+
+      <p><code>Strct</code> is entirely stack data, yet it still moves like a heap type would &mdash; because nobody wrote <code>#[derive(Copy)]</code>. This version compiles because neither move point is followed by a read of the old value.</p>
+    </div>
+
+    <!-- SLIDE 6: struct — trigger the error, twice -->
+    <div class="slide" data-idx="6">
+      <div class="slide-tag err-tag">Error case &middot; 2</div>
+      <h1>Same struct, now read after each move</h1>
+      <div class="subtitle">One move inside the function, one move at the call site &mdash; two separate errors</div>
+
+      <pre class="err-pre"><span class="kw">fn</span> <span class="fn">ownership_strcut</span>(s: <span class="ty">Strct</span>) {
+    <span class="kw">let mut</span> y: <span class="ty">Strct</span> = <span class="ty">Strct</span> { x: <span class="num">0</span>, y: <span class="num">0</span>, z: <span class="num">0</span> };
+    y = s;                     <span class="cm">// s moved into y</span>
+<span class="err-line">    <span class="mac">println!</span>(<span class="str">"{}"</span>, s.y);   <span class="cm">// s read after move &mdash; ERROR #1</span></span>
+}
+
+<span class="kw">fn</span> <span class="fn">main</span>() {
+    <span class="kw">let</span> s = <span class="ty">Strct</span> { x: <span class="num">0</span>, y: <span class="num">1</span>, z: <span class="num">2</span> };
+    <span class="fn">ownership_strcut</span>(s);          <span class="cm">// s moved into the call</span>
+<span class="err-line">    <span class="mac">println!</span>(<span class="str">"{}"</span>, s.y);   <span class="cm">// s read after move &mdash; ERROR #2</span></span>
+}</pre>
+
+      <div class="callout err">Same rule (<code>E0382</code>), triggered at two independent move points: <strong>inside</strong> the function body, and <strong>at the call site</strong> in <code>main</code>. Ownership doesn't care which stack frame moved it.</div>
+    </div>
+
+    <!-- SLIDE 7: mental model recap -->
+    <div class="slide" data-idx="7">
+      <div class="slide-tag">Mental model</div>
+      <h1>It's never "stack vs. heap"</h1>
+      <div class="subtitle">It's always: does this type implement <code>Copy</code>?</div>
+
+      <table>
+        <thead><tr><th>Type</th><th>Where stored</th><th><code>Copy</code>?</th><th>Passing it</th></tr></thead>
+        <tbody>
+          <tr><td><code>u32</code></td><td class="prose">stack</td><td class="prose"><span class="pill ok">yes</span></td><td class="prose">copies</td></tr>
+          <tr><td><code>struct { x: u32 }</code> (no derive)</td><td class="prose">stack</td><td class="prose"><span class="pill err">no</span></td><td class="prose">moves</td></tr>
+          <tr><td><code>Box&lt;u32&gt;</code></td><td class="prose">heap</td><td class="prose"><span class="pill err">no</span></td><td class="prose">moves</td></tr>
+          <tr><td><code>String</code></td><td class="prose">heap</td><td class="prose"><span class="pill err">no</span></td><td class="prose">moves</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout">Stack-only data is <em>usually</em> <code>Copy</code>, which is why the correlation feels causal &mdash; but a plain stack struct still moves unless you explicitly opt in with <code>#[derive(Copy, Clone)]</code>. The trait is the switch, not the memory location.</div>
+    </div>
+
+    <!-- SLIDE 8: The fixes -->
+    <div class="slide" data-idx="8">
+      <div class="slide-tag ok-tag">Fix</div>
+      <h1>Four ways to stop the move error</h1>
+      <div class="subtitle">Pick based on whether you need the original value again</div>
+
+      <div class="two-col">
+        <div>
+          <h2 class="ok-h2">1. Reassign instead of reading</h2>
+          <pre class="ok-pre"><span class="fn">test</span>(x);
+<span class="ok-line">x = <span class="ty">String</span>::<span class="fn">from</span>(<span class="str">"world"</span>);</span> <span class="cm">// no read of old x</span>
+<span class="fn">test</span>(x);</pre>
+          <p class="dim">Use when you don't need the old value at all.</p>
+
+          <h2 class="ok-h2">2. Borrow instead of moving</h2>
+          <pre class="ok-pre"><span class="kw">fn</span> <span class="fn">test</span>(x: &amp;<span class="ty">String</span>) { <span class="mac">println!</span>(<span class="str">"{}"</span>, x); }
+<span class="fn">test</span>(&amp;x);
+<span class="ok-line"><span class="mac">println!</span>(<span class="str">"{}"</span>, x);</span> <span class="cm">// x never moved</span></pre>
+          <p class="dim">Best default &mdash; the function only needs to read.</p>
+        </div>
+        <div>
+          <h2 class="ok-h2">3. Clone before the call</h2>
+          <pre class="ok-pre"><span class="fn">test</span>(x.<span class="fn">clone</span>());
+<span class="ok-line"><span class="mac">println!</span>(<span class="str">"{}"</span>, x);</span> <span class="cm">// original untouched</span></pre>
+          <p class="dim">Costs an allocation &mdash; use when the callee truly needs ownership.</p>
+
+          <h2 class="ok-h2">4. Derive Copy (structs of Copy fields)</h2>
+          <pre class="ok-pre"><span class="kw">#[derive(</span><span class="ty">Copy</span>, <span class="ty">Clone</span><span class="kw">)]</span>
+<span class="kw">struct</span> <span class="ty">Strct</span> { x: <span class="ty">u32</span>, y: <span class="ty">u32</span>, z: <span class="ty">u32</span> }
+<span class="cm">// now behaves like a scalar &mdash; copies on pass</span></pre>
+          <p class="dim">Only valid if every field is itself <code>Copy</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: Summary -->
+    <div class="slide" data-idx="9">
+      <div class="slide-tag">Summary</div>
+      <h1>The rule, one more time</h1>
+      <div class="subtitle">Everything on this deck reduces to one sentence</div>
+
+      <div class="callout"><strong>Reassignment is always legal.</strong> A move error only fires when you <em>read</em> a value after it has been moved &mdash; whether that value is a <code>String</code>, a plain struct, or a struct moved twice across two frames.</div>
+
+      <table>
+        <thead><tr><th>Question</th><th>Answer</th></tr></thead>
+        <tbody>
+          <tr><td class="prose">Does passing <code>x</code> then reassigning <code>x</code> error?</td><td class="prose"><span class="pill ok">No</span> &mdash; never, for any type</td></tr>
+          <tr><td class="prose">Does passing <code>x</code> then <em>reading</em> <code>x</code> error?</td><td class="prose"><span class="pill err">Yes</span> &mdash; unless the type is <code>Copy</code></td></tr>
+          <tr><td class="prose">Is a struct of <code>u32</code> fields scalar?</td><td class="prose"><span class="pill err">No</span> &mdash; scalar = primitive/indivisible only</td></tr>
+          <tr><td class="prose">Is it <code>Copy</code> automatically?</td><td class="prose"><span class="pill err">No</span> &mdash; must <code>#[derive(Copy)]</code> explicitly</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <nav>
+    <button class="nav-btn" id="prev" aria-label="Previous slide">&#8592;</button>
+    <div class="progress-track"><div class="progress-fill" id="progress"></div></div>
+    <span class="nav-counter" id="counter">1 / 10</span>
+    <button class="nav-btn" id="next" aria-label="Next slide">&#8594;</button>
+  </nav>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const N = slides.length;
+  let c = 0;
+  function go(i) {
+    if (i < 0 || i >= N) return;
+    slides[c].classList.remove('active'); c = i; slides[c].classList.add('active');
+    document.getElementById('counter').textContent = `${c+1} / ${N}`;
+    document.getElementById('progress').style.width = `${((c+1)/N)*100}%`;
+  }
+  document.getElementById('prev').addEventListener('click', () => go(c-1));
+  document.getElementById('next').addEventListener('click', () => go(c+1));
+  document.addEventListener('keydown', e => {
+    if (e.key==='ArrowRight'||e.key===' '){e.preventDefault();go(c+1)}
+    if (e.key==='ArrowLeft'){e.preventDefault();go(c-1)}
+    if (e.key==='Home'){e.preventDefault();go(0)}
+    if (e.key==='End'){e.preventDefault();go(N-1)}
+  });
+  let tx=0;
+  document.addEventListener('touchstart', e=>{tx=e.touches[0].clientX});
+  document.addEventListener('touchend', e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50){d<0?go(c+1):go(c-1)}});
+  go(0);
+</script>
